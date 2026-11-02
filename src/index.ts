@@ -1,7 +1,7 @@
 // The Blockwork community block library: serves index.json and the pack files
 // Blockwork downloads, and takes reviewed submissions from signed-in accounts.
 
-import { callback, currentUser, isAdmin, login, logout, PROVIDERS, type Provider, type User } from "./auth.ts";
+import { callback, currentUser, shareSession, isAdmin, login, logout, PROVIDERS, type Provider, type User } from "./auth.ts";
 import { capabilityList, esc, loginPage, message, page, verifiedBadge } from "./pages.ts";
 import { authorPage, home, packPage, published, sourcePage, sourceView, withBlockViews, type VersionRow } from "./browse.ts";
 import { deleteComment, postComment } from "./comments.ts";
@@ -71,6 +71,7 @@ export default {
     const loopbackForm = headers.has("X-Loopback-Form");
     headers.delete("X-Loopback-Form");
     for (const [k, v] of Object.entries(securityHeaders(env, loopbackForm))) headers.set(k, v);
+    if (!headers.has("Set-Cookie")) shareSession(req, env, headers);
     return new Response(res.body, { status: res.status, headers });
   },
 };

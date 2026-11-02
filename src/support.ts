@@ -4,7 +4,7 @@
 // email or on the ticket's page, which the emailed link opens without signing in.
 
 import PostalMime from "postal-mime";
-import { hash, isAdmin, logout, randomToken, type User } from "./auth.ts";
+import { hash, isAdmin, logout, PROVIDERS, randomToken, type User } from "./auth.ts";
 import type { Env } from "./index.ts";
 import { esc, page, type Shell } from "./pages.ts";
 import { commentHtml } from "./comments.ts";
@@ -87,7 +87,7 @@ function redirect(location: string): Response {
 }
 
 function shell(env: Env, user: User | null, staff: boolean): Shell {
-  const login = `${env.SITE_URL}/login?next=${encodeURIComponent(link(env, "/"))}`;
+  const login = link(env, "/login");
   const nav = user
     ? `<a href="${link(env, "/")}">My tickets</a><a href="${link(env, "/new")}">New ticket</a>${staff ? `<a href="${link(env, "/queue")}">Queue</a>` : ""}
        <span class="who">${user.avatar ? `<img class="avatar" src="${esc(user.avatar)}" alt="">` : ""}${esc(user.name)}</span>
@@ -108,13 +108,14 @@ function statusPill(status: Status, staff: boolean): string {
 // Pages
 
 export async function supportRoute(req: Request, env: Env, path: string, user: User | null): Promise<Response> {
-  const method = req.method;
+  const method = req.method === "HEAD" ? "GET" : req.method;
   const staff = isStaff(env, user);
   const url = new URL(req.url);
   let m: RegExpMatchArray | null;
   if (method === "GET" && path === "/") return home(env, user, staff);
+  if (method === "GET" && path === "/login") return loginPage(env, user, staff, url.searchParams.get("next") ?? "/");
   if (path === "/new") {
-    if (!user) return redirect(`${env.SITE_URL}/login?next=${encodeURIComponent(link(env, "/new"))}`);
+    if (!user) return redirect(link(env, `/login?next=${encodeURIComponent("/new")}`));
     if (method === "GET") return newForm(env, user, staff, "", {}, await savedEmail(env, user));
     if (method === "POST") return createFromForm(req, env, user, staff);
   }
@@ -134,6 +135,26 @@ export async function supportRoute(req: Request, env: Env, path: string, user: U
     }
   }
   return notFound(env, user, staff);
+}
+
+/** Sign-in on the helpdesk's own pages. The providers send everyone back to the
+ *  library's address, whose cookie covers this host too, and on to `next` here. */
+function loginPage(env: Env, user: User | null, staff: boolean, next: string): Response {
+  const path = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  if (user) return redirect(link(env, path));
+  const back = encodeURIComponent(link(env, path));
+  const buttons = Object.entries(PROVIDERS)
+    .map(([id, name]) => `<a class="button large" href="${esc(`${env.SITE_URL}/auth/${id}/login?next=${back}`)}">Sign in with ${esc(name)}</a>`)
+    .join("");
+  return page(
+    "Sign in",
+    null,
+    false,
+    `<h1>Sign in</h1><p class="muted">Use your Blockwork community account, or make one by signing in. You can also email
+     <a href="mailto:${esc(fromAddress(env))}">${esc(fromAddress(env))}</a> without an account.</p><div class="signin">${buttons}</div>`,
+    200,
+    shell(env, null, false),
+  );
 }
 
 function notFound(env: Env, user: User | null, staff: boolean): Response {

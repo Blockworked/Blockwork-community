@@ -196,8 +196,21 @@ export async function callback(req: Request, env: Env, provider: Provider): Prom
   } catch {}
   const headers = new Headers({ Location: target });
   for (const c of sessionCookies(env, token, SESSION_DAYS * 86400)) headers.append("Set-Cookie", c);
+  if (env.COOKIE_DOMAIN) headers.append("Set-Cookie", setCookie("sd", "1", SESSION_DAYS * 86400, "/", env.COOKIE_DOMAIN));
   headers.append("Set-Cookie", setCookie("oauth", "", 0, "/auth"));
   return new Response(null, { status: 302, headers });
+}
+
+/**
+ * Sign-ins from before COOKIE_DOMAIN have a host-only cookie the helpdesk never
+ * sees. Re-issues it domain-wide once, marked by the "sd" cookie.
+ */
+export function shareSession(req: Request, env: Env, headers: Headers): void {
+  if (!env.COOKIE_DOMAIN || cookie(req, "sd")) return;
+  const found = cookies(req, "session");
+  if (found.length !== 1 || !found[0]) return;
+  for (const c of sessionCookies(env, found[0], SESSION_DAYS * 86400)) headers.append("Set-Cookie", c);
+  headers.append("Set-Cookie", setCookie("sd", "1", SESSION_DAYS * 86400, "/", env.COOKIE_DOMAIN));
 }
 
 export async function logout(req: Request, env: Env, to = "/"): Promise<Response> {
