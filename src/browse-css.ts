@@ -67,7 +67,7 @@ dl.inputs dd { margin: 0; color: var(--muted); }
 dl.inputs code { font-size: 12px; color: var(--fg); }
 ul.versions { list-style: none; padding: 0; margin: 0; font-size: 14px; }
 ul.versions li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 6px 0; }
-ul.versions .v { font-weight: 600; }
+ul.versions .v { padding: 3px 7px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg); font-size: 12px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
 ul.versions .links { margin-left: auto; font-size: 13px; display: flex; gap: 12px; }
 
 /* Author pages. */
