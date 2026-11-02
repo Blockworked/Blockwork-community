@@ -5,7 +5,7 @@ import type { User } from "./auth.ts";
 import type { Env } from "./index.ts";
 import { esc, message, verifiedBadge } from "./pages.ts";
 import { OFFICIAL_OWNER } from "./packs.ts";
-import { date, type ListedPack } from "./browse.ts";
+import { date, PEN, type ListedPack } from "./browse.ts";
 
 export const MAX_COMMENT = 2000;
 const BURST = 5;
@@ -63,7 +63,7 @@ export async function commentsSection(env: Env, user: User | null, admin: boolea
     .map((c) => {
       const who = `${esc(c.name)}${c.user_id === OFFICIAL_OWNER ? verifiedBadge() : ""}`;
       const name = c.public_id ? `<a href="/authors/${encodeURIComponent(c.public_id)}">${who}</a>` : who;
-      const badge = c.user_id === p.owner_id ? ` <span class="pill">author</span>` : "";
+      const badge = c.user_id === p.owner_id ? ` <span class="mark">${PEN}made this pack</span>` : "";
       const del = canDelete(user, admin, p.owner_id, c)
         ? `<form class="inline" method="post" action="/comments/${c.id}/delete"><button class="ghost small" title="Delete this comment">Delete</button></form>`
         : "";
@@ -86,7 +86,7 @@ export async function commentsSection(env: Env, user: User | null, admin: boolea
       <textarea id="comment" name="body" rows="4" maxlength="${MAX_COMMENT}" required placeholder="Ask a question, share how you use it, or report a problem">${esc(draft)}</textarea>
       <p class="form-foot"><span class="muted">Plain text. Links work. Be kind.</span><button class="primary">Post comment</button></p></form>`;
   }
-  return `<section class="comments" id="comments"><h2>Comments <span class="n">${results.length}</span></h2>
+  return `<section class="comments" id="comments"><h2>${results.length === 1 ? "1 comment" : `${results.length} comments`}</h2>
     ${items ? `<ol class="comment-list">${items}</ol>` : `<p class="muted">No comments yet.</p>`}${form}</section>`;
 }
 

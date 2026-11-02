@@ -168,6 +168,8 @@ export function authorLink(name: string, publicId: string | null | undefined, of
 // Lucide's arrow-left and chevron-right, drawn like the site nav's icons.
 const LUCIDE = `xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"`;
 const BACK = `<svg ${LUCIDE} width="15" height="15"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>`;
+export const CHECK = `<svg ${LUCIDE}><path d="M20 6 9 17l-5-5"/></svg>`;
+export const PEN = `<svg ${LUCIDE}><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/></svg>`;
 const CHEVRON = `<svg ${LUCIDE} width="13" height="13" class="chevron"><path d="m9 18 6-6-6-6"/></svg>`;
 const COMMENT_ICON = `<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
 
@@ -222,7 +224,8 @@ export async function home(env: Env, user: User | null, admin: boolean, params: 
     f.q ? `Search: ${f.q}` : "Packs",
     user,
     admin,
-    `<section class="hero"><h1>${esc(env.LIBRARY_NAME)}</h1>
+    `<section class="hero"><h1>Community blocks</h1>
+     <p>Packs of blocks people made for Blockwork.</p>
      <p class="actions"><a class="button primary large" href="/submit">Submit a pack</a><span>Install packs in Blockwork from <kbd>My Blocks${CHEVRON}Browse</kbd></span></p></section>
      ${filterForm(f)}${summary}<div class="pack-list">${list}</div>${await backgroundRenders(env, admin)}`,
   );
@@ -281,7 +284,7 @@ export async function packPage(env: Env, user: User | null, admin: boolean, id: 
     .join("");
   const versionList = versions
     .map(
-      (v, i) => `<li><span class="v">${esc(v.version || v.sha256.slice(0, 8))}</span>${i === 0 ? ` <span class="pill">current</span>` : ""}
+      (v, i) => `<li><span class="v">${esc(v.version || v.sha256.slice(0, 8))}</span>${i === 0 ? ` <span class="mark latest">${CHECK}latest</span>` : ""}
         <span class="muted">${date(v.reviewed_at ?? v.submitted_at)}</span>
         <span class="links"><a href="/packs/${encodeURIComponent(p.pack_id)}/source?v=${v.sha256}">source</a> <a href="/packs/${v.sha256}.json" download="${esc(p.pack_id)}-${esc(v.version || v.sha256.slice(0, 8))}.blockpack">file</a></span></li>`,
     )

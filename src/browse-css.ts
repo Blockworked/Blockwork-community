@@ -4,8 +4,11 @@
 
 export const BROWSE_CSS = `
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.pill { display: inline-block; padding: 1px 7px; border-radius: 999px; background: rgba(var(--accent-rgb), 0.16); color: var(--accent); font-size: 11px; font-weight: 600; vertical-align: 1px; }
-.n { display: inline-block; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--bg3); color: var(--muted); font-size: 12px; font-weight: 600; text-align: center; vertical-align: 2px; }
+/* Small facts are words with an icon, not pills: a tick for the latest version, a pen for a pack's author. */
+.mark { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 13px; font-weight: 400; }
+.mark svg { width: 13px; height: 13px; flex-shrink: 0; }
+.mark.latest svg { color: var(--ok); }
+.n { color: var(--muted); font-weight: 400; }
 a.author { color: inherit; font-weight: 600; }
 /* A row of facts about a pack, spaced apart rather than joined with separators. */
 .meta { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 18px; row-gap: 2px; }
@@ -55,7 +58,7 @@ input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; m
 .block-item:last-child { border-bottom: 0; }
 .block-item p { margin: 6px 0; max-width: 70ch; }
 .block-name { display: flex; align-items: center; gap: 8px; }
-.kind { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.kind { font-size: 13px; color: var(--muted); }
 .see-how { font-size: 13px; }
 dl.inputs { margin: 8px 0; display: grid; gap: 2px; font-size: 13px; }
 dl.inputs div { display: flex; gap: 8px; }
