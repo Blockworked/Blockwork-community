@@ -8,6 +8,7 @@ import { deleteComment, postComment } from "./comments.ts";
 import { blockPictures, BROWSE_JS, redraw, renderFile, rendersPage, saveRenders, viewerUrl } from "./renders.ts";
 import { idPart, OFFICIAL_OWNER } from "./packs.ts";
 import { acceptUpload, api, appLoginConfirm, appLoginPage } from "./api.ts";
+import { FONTS } from "./fonts.ts";
 import { FAVICON_PNG, LOGO_PNG } from "./logo.ts";
 import { setMainSite, SITE_JS } from "./site-nav.ts";
 import { receiveEmail, supportPath, supportRoute, supportUrl } from "./support.ts";
@@ -46,7 +47,7 @@ function securityHeaders(env: Env, loopbackForm = false): Record<string, string>
   const formAction = loopbackForm ? "'self' http://127.0.0.1:*" : "'self'";
   return {
     "Content-Security-Policy":
-      `default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' https:; connect-src 'self'; frame-src ${viewer}; form-action ${formAction}; frame-ancestors 'none'; base-uri 'none'`,
+      `default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' https:; font-src 'self'; connect-src 'self'; frame-src ${viewer}; form-action ${formAction}; frame-ancestors 'none'; base-uri 'none'`,
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "same-origin",
   };
@@ -92,6 +93,8 @@ async function route(req: Request, env: Env): Promise<Response> {
   if (method === "GET" && (m = path.match(/^\/packs\/([0-9a-f]{64})\.json$/))) return packFile(env, m[1]);
   if (method === "GET" && path === "/logo.png") return png(LOGO_PNG);
   if (method === "GET" && path === "/favicon.png") return png(FAVICON_PNG);
+  const font = method === "GET" ? /^\/fonts\/([a-z-]+)\.woff2$/.exec(path) : null;
+  if (font && Object.hasOwn(FONTS, font[1])) return woff2(FONTS[font[1]]);
   if (method === "GET" && path === "/browse.js") {
     return new Response(BROWSE_JS, {
       headers: { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "public, max-age=3600" },
@@ -203,6 +206,11 @@ async function packFile(env: Env, sha: string): Promise<Response> {
   const object = ok ? await env.PACKS.get(`packs/${sha}.json`) : null;
   if (!object) return new Response("Not found", { status: 404 });
   return new Response(object.body, { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=3600" } });
+}
+
+function woff2(base64: string): Response {
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  return new Response(bytes, { headers: { "Content-Type": "font/woff2", "Cache-Control": "public, max-age=31536000, immutable" } });
 }
 
 function png(base64: string): Response {

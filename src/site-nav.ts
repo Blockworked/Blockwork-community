@@ -78,7 +78,7 @@ export const SITE_NAV_CSS = `
   backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border-bottom: 1px solid var(--glass-border); box-shadow: var(--shadow-sm); }
 .site-header .container, .site-footer .container { max-width: 1120px; padding: 0 24px; }
 .site-header-inner { display: flex; align-items: center; gap: 12px; height: 56px; }
-.brand { display: flex; align-items: center; gap: 8px; color: var(--fg); font-weight: 800; font-size: 16px; line-height: 1; letter-spacing: -0.045em; }
+.brand { display: flex; align-items: center; gap: 8px; color: var(--fg); font-weight: 700; font-size: 17px; line-height: 1; }
 .brand:hover { text-decoration: none; }
 .brand img { width: 28px; height: 28px; }
 .site-nav { display: flex; gap: 2px; margin-left: 16px; }

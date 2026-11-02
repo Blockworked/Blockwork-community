@@ -319,7 +319,7 @@ async function ticketPage(env: Env, user: User | null, staff: boolean, id: numbe
     .filter((m) => staff || m.kind !== "note")
     .map((m) => {
       const name = m.kind === "requester" ? m.author || t.name || t.email : `${m.author || "Blockworked"}${m.kind === "note" ? "" : " (Blockworked)"}`;
-      const pill = m.kind === "note" ? ` <span class="pill">internal note</span>` : m.kind === "staff" && staff ? ` <span class="pill">staff</span>` : "";
+      const pill = m.kind === "note" ? ` <span class="mark">internal note</span>` : m.kind === "staff" && staff ? ` <span class="mark">staff</span>` : "";
       const avatar = m.avatar
         ? `<img class="avatar" src="${esc(m.avatar)}" alt="">`
         : `<span class="avatar blank" aria-hidden="true">${esc((name || "?").slice(0, 1).toUpperCase())}</span>`;
