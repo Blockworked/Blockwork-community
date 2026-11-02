@@ -3,7 +3,11 @@ main = "src/index.ts"
 compatibility_date = "2026-10-01"
 # Only the custom domain, so sign-in cookies and OAuth callbacks share one host.
 workers_dev = false
-routes = [{ pattern = "community.blockworked.com", custom_domain = true }]
+routes = [
+  { pattern = "community.blockworked.com", custom_domain = true },
+  # The helpdesk (src/support.ts). Same Worker, so it shares accounts with the library.
+  { pattern = "support.blockworked.com", custom_domain = true },
+]
 
 [vars]
 # The address the site is served at; OAuth callbacks go to <SITE_URL>/auth/<provider>/callback.
@@ -13,6 +17,15 @@ MAIN_SITE_URL = "https://blockworked.com"
 LIBRARY_NAME = "Blockwork community blocks"
 # Account ids allowed to review, like "github:123", comma-separated.
 ADMINS = "github:39657565"
+# The helpdesk. support@ mail reaches the Worker through an Email Routing rule.
+SUPPORT_URL = "https://support.blockworked.com"
+SUPPORT_FROM = "support@blockworked.com"
+# Told about new tickets and replies, comma-separated.
+SUPPORT_NOTIFY = "ethan@blockworked.com"
+# Account ids who answer tickets besides ADMINS, comma-separated.
+SUPPORT_STAFF = ""
+# Sign-in cookies cover support.blockworked.com too.
+COOKIE_DOMAIN = "blockworked.com"
 
 [[d1_databases]]
 binding = "DB"
@@ -24,4 +37,5 @@ binding = "PACKS"
 bucket_name = "blockwork-library"
 
 # Secrets (wrangler secret put, or .dev.vars locally):
-# GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+# GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+# SMTP2GO_API_KEY (ticket email; without it mail is only logged)

@@ -24,15 +24,29 @@ export async function hash(text: string): Promise<string> {
 }
 
 export function cookie(req: Request, name: string): string | null {
-  for (const part of (req.headers.get("Cookie") ?? "").split(";")) {
-    const [k, ...v] = part.trim().split("=");
-    if (k === name) return v.join("=");
-  }
-  return null;
+  return cookies(req, name)[0] ?? null;
 }
 
-function setCookie(name: string, value: string, maxAge: number, path = "/"): string {
-  return `${name}=${value}; Path=${path}; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
+/** Every value sent under a name: a host-only and a domain-wide session can both arrive. */
+export function cookies(req: Request, name: string): string[] {
+  const found: string[] = [];
+  for (const part of (req.headers.get("Cookie") ?? "").split(";")) {
+    const [k, ...v] = part.trim().split("=");
+    if (k === name) found.push(v.join("="));
+  }
+  return found;
+}
+
+function setCookie(name: string, value: string, maxAge: number, path = "/", domain = ""): string {
+  return `${name}=${value}; Path=${path}; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax${domain ? `; Domain=${domain}` : ""}`;
+}
+
+/** The session cookie, shared with the helpdesk's host when COOKIE_DOMAIN is set.
+ *  Also clears the host-only one older sign-ins left, so only one is ever sent. */
+function sessionCookies(env: Env, token: string, maxAge: number): string[] {
+  const out = [setCookie("session", token, maxAge, "/", env.COOKIE_DOMAIN ?? "")];
+  if (env.COOKIE_DOMAIN) out.unshift(setCookie("session", "", 0));
+  return out;
 }
 
 export function isAdmin(env: Env, user: User | null): boolean {
@@ -56,20 +70,29 @@ export function isReservedName(name: string): boolean {
 }
 
 export async function currentUser(req: Request, env: Env): Promise<User | null> {
-  const token = cookie(req, "session");
-  if (!token) return null;
-  return env.DB.prepare(
-    "SELECT u.id, u.name, u.avatar, u.banned FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ? AND s.kind = 'web'",
-  )
-    .bind(await hash(token), Date.now())
-    .first<User>()
+  for (const token of cookies(req, "session").slice(0, 2)) {
+    const user = await env.DB.prepare(
+      "SELECT u.id, u.name, u.avatar, u.banned FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ? AND s.kind = 'web'",
+    )
+      .bind(await hash(token), Date.now())
+      .first<User>();
     // Sessions from before the name was reserved stop working.
-    .then((user) => (user && isReservedName(user.name) && !isAdmin(env, user) ? null : user));
+    if (user) return isReservedName(user.name) && !isAdmin(env, user) ? null : user;
+  }
+  return null;
 }
 
-/** Only same-site paths, so a login link can't bounce someone to another site. */
-function safeNext(next: string | null): string {
-  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
+/** Only same-site paths or the helpdesk, so a login link can't bounce someone to another site. */
+export function safeNext(next: string | null, env?: Pick<Env, "SUPPORT_URL">): string {
+  if (next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\")) return next;
+  if (next && env?.SUPPORT_URL) {
+    try {
+      const support = new URL(env.SUPPORT_URL);
+      const url = new URL(next);
+      if (url.origin === support.origin && url.pathname.startsWith(support.pathname)) return url.toString();
+    } catch {}
+  }
+  return "/";
 }
 
 function redirectUri(env: Env, provider: Provider): string {
@@ -93,7 +116,7 @@ export function login(env: Env, provider: Provider, next: string | null): Respon
     url.searchParams.set("scope", "openid profile");
   }
   const headers = new Headers({ Location: url.toString() });
-  headers.append("Set-Cookie", setCookie("oauth", `${state}.${encodeURIComponent(safeNext(next))}`, 600, "/auth"));
+  headers.append("Set-Cookie", setCookie("oauth", `${state}.${encodeURIComponent(safeNext(next, env))}`, 600, "/auth"));
   return new Response(null, { status: 302, headers });
 }
 
@@ -169,16 +192,20 @@ export async function callback(req: Request, env: Env, provider: Provider): Prom
     .run();
   let target = "/";
   try {
-    target = safeNext(decodeURIComponent(next));
+    target = safeNext(decodeURIComponent(next), env);
   } catch {}
   const headers = new Headers({ Location: target });
-  headers.append("Set-Cookie", setCookie("session", token, SESSION_DAYS * 86400));
+  for (const c of sessionCookies(env, token, SESSION_DAYS * 86400)) headers.append("Set-Cookie", c);
   headers.append("Set-Cookie", setCookie("oauth", "", 0, "/auth"));
   return new Response(null, { status: 302, headers });
 }
 
-export async function logout(req: Request, env: Env): Promise<Response> {
-  const token = cookie(req, "session");
-  if (token) await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await hash(token)).run();
-  return new Response(null, { status: 303, headers: { Location: "/", "Set-Cookie": setCookie("session", "", 0) } });
+export async function logout(req: Request, env: Env, to = "/"): Promise<Response> {
+  for (const token of cookies(req, "session").slice(0, 2)) {
+    await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await hash(token)).run();
+  }
+  const headers = new Headers({ Location: to });
+  headers.append("Set-Cookie", setCookie("session", "", 0));
+  if (env.COOKIE_DOMAIN) headers.append("Set-Cookie", setCookie("session", "", 0, "/", env.COOKIE_DOMAIN));
+  return new Response(null, { status: 303, headers });
 }

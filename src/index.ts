@@ -10,6 +10,7 @@ import { idPart, OFFICIAL_OWNER } from "./packs.ts";
 import { acceptUpload, api, appLoginConfirm, appLoginPage } from "./api.ts";
 import { FAVICON_PNG, LOGO_PNG } from "./logo.ts";
 import { setMainSite, SITE_JS } from "./site-nav.ts";
+import { receiveEmail, supportPath, supportRoute, supportUrl } from "./support.ts";
 
 export interface Env {
   DB: D1Database;
@@ -24,6 +25,18 @@ export interface Env {
   GITHUB_CLIENT_SECRET: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
+  /** The helpdesk, https://support.blockworked.com (support.ts). */
+  SUPPORT_URL?: string;
+  /** The address tickets are emailed from and to. */
+  SUPPORT_FROM?: string;
+  /** Comma-separated addresses told about new tickets and replies. */
+  SUPPORT_NOTIFY?: string;
+  /** Comma-separated account ids who answer tickets, besides ADMINS. */
+  SUPPORT_STAFF?: string;
+  /** Set to blockworked.com so a sign-in here also signs in on the helpdesk. */
+  COOKIE_DOMAIN?: string;
+  /** smtp2go API key for sending ticket email (a secret). */
+  SMTP2GO_API_KEY?: string;
 }
 
 function securityHeaders(env: Env, loopbackForm = false): Record<string, string> {
@@ -40,8 +53,13 @@ function securityHeaders(env: Env, loopbackForm = false): Record<string, string>
 }
 
 export default {
+  // Cloudflare Email Routing hands support@ mail to the Worker here.
+  async email(message: ForwardableEmailMessage, env: Env): Promise<void> {
+    await receiveEmail(message, env);
+  },
+
   async fetch(req: Request, env: Env): Promise<Response> {
-    setMainSite(env.MAIN_SITE_URL);
+    setMainSite(env.MAIN_SITE_URL, supportUrl(env));
     let res: Response;
     try {
       res = await route(req, env);
@@ -63,8 +81,9 @@ async function route(req: Request, env: Env): Promise<Response> {
   const method = req.method;
   // The app's API takes bearer tokens, never the cookie, so it can't be forged from another site.
   if (path.startsWith("/api/")) return api(req, env, path);
-  // Forms only come from this site.
-  if (method === "POST" && req.headers.get("Origin") !== new URL(env.SITE_URL).origin) {
+  // Forms only come from this site, or the helpdesk's own pages.
+  const origin = req.headers.get("Origin");
+  if (method === "POST" && origin !== new URL(env.SITE_URL).origin && origin !== new URL(supportUrl(env)).origin) {
     return new Response("Cross-site request refused", { status: 403 });
   }
   if (method === "GET" && path === "/index.json") return indexJson(env);
@@ -84,6 +103,12 @@ async function route(req: Request, env: Env): Promise<Response> {
   }
 
   const user = await currentUser(req, env);
+  const support = supportPath(env, url);
+  if (support !== null) return supportRoute(req, env, support, user);
+  // The helpdesk's host serves nothing else.
+  if (url.host === new URL(supportUrl(env)).host && url.host !== new URL(env.SITE_URL).host) {
+    return Response.redirect(`${env.SITE_URL}${path}${url.search}`, 302);
+  }
   const admin = isAdmin(env, user);
   if (method === "GET" && path === "/") return home(env, user, admin, url.searchParams);
   if (method === "GET" && (m = path.match(/^\/renders\/([0-9a-f]{64})\/([A-Za-z0-9_-]{1,64})\.(dark|light)\.png$/))) {

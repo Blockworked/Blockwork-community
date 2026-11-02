@@ -3,8 +3,9 @@
 import type { User } from "./auth.ts";
 import { PROVIDERS } from "./auth.ts";
 import { CAPABILITIES } from "./packs.ts";
-import { SITE_NAV_CSS, siteFooter, siteHeader } from "./site-nav.ts";
+import { SITE_NAV_CSS, siteFooter, siteHeader, type NavPlace } from "./site-nav.ts";
 import { BROWSE_CSS } from "./browse-css.ts";
+import { SUPPORT_CSS } from "./support-css.ts";
 
 export function esc(value: unknown): string {
   return String(value ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -127,23 +128,38 @@ img.avatar { width: 22px; height: 22px; border-radius: 50%; }
   .site-footer .copyright { margin-left: 0; }
 }
 ${BROWSE_CSS}
+${SUPPORT_CSS}
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 `;
 
-export function page(title: string, user: User | null, admin: boolean, body: string, status = 200): Response {
+/** The bar under the shared header: whose section of the site this is, and its links. */
+export interface Shell {
+  name: string;
+  href: string;
+  nav: string;
+  /** Where the browser title says the page is. */
+  site: string;
+  place?: NavPlace;
+}
+
+export function libraryShell(user: User | null, admin: boolean): Shell {
   const nav = user
     ? `<a href="/submit">Submit a pack</a><a href="/me">My packs</a>${admin ? `<a href="/admin">Review</a>` : ""}
        <span class="who">${user.avatar ? `<img class="avatar" src="${esc(user.avatar)}" alt="">` : ""}${esc(user.name)}</span>
        <form class="inline" method="post" action="/auth/logout"><button class="ghost">Sign out</button></form>`
     : `<a href="/login">Sign in</a>`;
+  return { name: "Community blocks", href: "/", nav, site: "Blockwork community blocks" };
+}
+
+export function page(title: string, user: User | null, admin: boolean, body: string, status = 200, shell = libraryShell(user, admin)): Response {
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} | Blockwork community blocks</title><link rel="icon" type="image/png" href="/favicon.png">
+<title>${esc(title)} | ${esc(shell.site)}</title><link rel="icon" type="image/png" href="/favicon.png">
 <meta name="theme-color" content="#1c1c1e" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f2f2f5" media="(prefers-color-scheme: light)">
 <script src="/site.js"></script><style>${STYLE}</style></head>
-<body>${siteHeader()}
-<div class="subbar"><div class="container"><a class="subbar-title" href="/">Community blocks</a><nav aria-label="Library">${nav}</nav></div></div>
+<body>${siteHeader(shell.place)}
+<div class="subbar"><div class="container"><a class="subbar-title" href="${esc(shell.href)}">${esc(shell.name)}</a><nav aria-label="${esc(shell.name)}">${shell.nav}</nav></div></div>
 <main><div class="container">${body}</div></main>
-${siteFooter()}</body></html>`;
+${siteFooter(shell.place)}</body></html>`;
   return new Response(html, { status, headers: { "Content-Type": "text/html; charset=utf-8" } });
 }
 

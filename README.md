@@ -169,6 +169,33 @@ never the site's cookie:
 - `POST /api/v1/packs`: upload a `.blockpack` (a new pack or an update), reviewed like the form's
 - `POST /api/v1/app/logout`
 
+## Support
+
+The same Worker is the helpdesk at support.blockworked.com (`src/support.ts`).
+Signed-in accounts file tickets on the site; anyone can email
+support@blockworked.com. Staff (`ADMINS` plus `SUPPORT_STAFF`) answer from
+`/queue`, and each answer is emailed to whoever filed the ticket through
+smtp2go. They can reply by email (matched by `In-Reply-To` or the `[#n]` in the
+subject, and only from the address that filed it) or on the ticket's page,
+which the emailed link opens without an account. `SUPPORT_NOTIFY` hears about
+new tickets and replies.
+
+Setting it up once:
+
+- `support.blockworked.com` is a custom domain route in `wrangler.toml`; the
+  first deploy creates its DNS record.
+- In Email Routing, a rule for `support@blockworked.com` with the action "Send
+  to a Worker" and this Worker (`blockwork-library`).
+- `wrangler secret put SMTP2GO_API_KEY`. Without it, mail is only logged.
+- `COOKIE_DOMAIN = "blockworked.com"` makes sign-ins cover the helpdesk; people
+  signed in before it sign in once more to use the helpdesk.
+
+Locally: `npx wrangler dev --var SITE_URL:http://community.blockworked.com
+--var SUPPORT_URL:http://community.blockworked.com/support --var
+COOKIE_DOMAIN:`, then the helpdesk is at `localhost:8787/support`, and
+`curl -X POST "localhost:8787/cdn-cgi/handler/email?from=a@example.com&to=support@blockworked.com" --data-binary @mail.eml`
+delivers an email to it.
+
 ## Deploying
 
 1. `npx wrangler d1 create blockwork-library` and put the id in
