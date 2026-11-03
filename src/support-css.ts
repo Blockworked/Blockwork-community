@@ -8,11 +8,12 @@ export const SUPPORT_CSS = `
 .ticket-list .subject { font-weight: 600; flex: 1; min-width: 12ch; overflow-wrap: anywhere; }
 .ticket-list .num { color: var(--muted); font-variant-numeric: tabular-nums; }
 .ticket-list .who-from, .ticket-list .time { color: var(--muted); font-size: 13px; }
-.ticket-status { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--bg3); color: var(--muted); white-space: nowrap; }
-.ticket-status.s-open { background: rgba(var(--accent-rgb), 0.16); color: var(--accent); }
-.ticket-status.s-answered { background: rgba(48, 209, 88, 0.16); color: #30d158; }
-:root[data-theme="light"] .ticket-status.s-answered { color: #1f8a3b; }
-@media (prefers-color-scheme: light) { :root:not([data-theme]) .ticket-status.s-answered { color: #1f8a3b; } }
+.ticket-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--fg); white-space: nowrap; }
+.ticket-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.ticket-status.s-open::before { background: var(--accent); }
+.ticket-status.s-answered::before { background: var(--ok); }
+.ticket-status.s-closed { color: var(--muted); }
+.ticket-status.s-closed::before { background: none; box-shadow: inset 0 0 0 1.5px var(--muted); }
 .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 8px 0 4px; }
 .tabs a { padding: 6px 12px; border-radius: var(--radius); font-size: 13px; color: var(--muted); }
 .tabs a[aria-current] { background: var(--bg3); color: var(--fg); font-weight: 600; }

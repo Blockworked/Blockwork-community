@@ -100,7 +100,7 @@ function when(ms: number): string {
   return new Date(ms).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" });
 }
 
-function statusPill(status: Status, staff: boolean): string {
+function statusMark(status: Status, staff: boolean): string {
   return `<span class="ticket-status s-${status}">${esc((staff ? STAFF_LABEL : STATUS_LABEL)[status])}</span>`;
 }
 
@@ -173,7 +173,7 @@ async function home(env: Env, user: User | null, staff: boolean): Promise<Respon
       "Support",
       null,
       false,
-      `<h1>Blockworked Support</h1><p class="muted">Questions about Blockwork, the community library or your account? We're here to help.</p>${ways}`,
+      `<h1>Support</h1><p class="muted">Questions about Blockwork, the community library or your account? Ask here.</p>${ways}`,
       200,
       shell(env, null, false),
     );
@@ -186,7 +186,7 @@ async function home(env: Env, user: User | null, staff: boolean): Promise<Respon
     "Support",
     user,
     staff,
-    `<h1>Blockworked Support</h1>${ways}<h2>Your tickets</h2>${list}
+    `<h1>Support</h1>${ways}<h2>Your tickets</h2>${list}
      <p class="muted">Tickets you emailed in are answered by email; their links open them here.</p>`,
     200,
     shell(env, user, staff),
@@ -195,7 +195,7 @@ async function home(env: Env, user: User | null, staff: boolean): Promise<Respon
 
 function ticketRow(env: Env, t: Ticket, staff: boolean): string {
   return `<li><a class="row" href="${link(env, `/tickets/${t.id}`)}"><span class="num">#${t.id}</span><span class="subject">${esc(t.subject)}</span>
-    ${staff ? `<span class="who-from">${esc(t.name || t.email)}</span>` : ""}${statusPill(t.status, staff)}<span class="time">${esc(when(t.updated_at))}</span></a></li>`;
+    ${staff ? `<span class="who-from">${esc(t.name || t.email)}</span>` : ""}${statusMark(t.status, staff)}<span class="time">${esc(when(t.updated_at))}</span></a></li>`;
 }
 
 function newForm(env: Env, user: User, staff: boolean, error = "", draft: { subject?: string; body?: string; email?: string } = {}, savedEmail = ""): Response {
@@ -349,7 +349,7 @@ async function ticketPage(env: Env, user: User | null, staff: boolean, id: numbe
     user,
     staff,
     `${crumbs}<h1>${esc(t.subject)} <span class="version">#${t.id}</span></h1>
-     <p>${statusPill(t.status, staff)}</p>${staffBits}
+     <p>${statusMark(t.status, staff)}</p>${staffBits}
      <ol class="thread comment-list">${items}</ol>${replyForm}`,
     error ? 400 : 200,
     shell(env, user, staff),
