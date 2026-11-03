@@ -14,6 +14,8 @@ export interface Rendered {
   name: string;
   width: number;
   height: number;
+  /** "webp", or absent for the PNGs every version had before. */
+  format?: "webp";
 }
 
 export interface Renders {
@@ -36,7 +38,7 @@ export function viewerUrl(env: Env): string {
 }
 
 function picture(sha: string, at: number, b: Rendered): string {
-  const src = (theme: string) => `/renders/${sha}/${encodeURIComponent(b.id)}.${theme}.png?at=${at}`;
+  const src = (theme: string) => `/renders/${sha}/${encodeURIComponent(b.id)}.${theme}.${b.format ?? "png"}?at=${at}`;
   const img = (theme: string) =>
     `<img class="on-${theme}" src="${src(theme)}" width="${b.width}" height="${b.height}" alt="${esc(b.name)}" loading="lazy">`;
   return `${img("dark")}${img("light")}`;
@@ -73,10 +75,16 @@ export function viewer(env: Env, packUrl: string, title: string, renderTo = ""):
 }
 
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+const RIFF = [0x52, 0x49, 0x46, 0x46];
+const WEBP = [0x57, 0x45, 0x42, 0x50];
 const MAX_PICTURE = 512 * 1024;
 const MAX_UPLOAD = 16 * 1024 * 1024;
 
-function decodePng(base64: unknown): Uint8Array | null {
+type Picture = { bytes: Uint8Array; format: "png" | "webp" };
+const TYPES = { png: "image/png", webp: "image/webp" } as const;
+
+/** A base64 PNG or WebP. */
+export function decodePicture(base64: unknown): Picture | null {
   if (typeof base64 !== "string" || base64.length > (MAX_PICTURE * 4) / 3 + 4) return null;
   let bytes: Uint8Array;
   try {
@@ -84,7 +92,9 @@ function decodePng(base64: unknown): Uint8Array | null {
   } catch {
     return null;
   }
-  return PNG.every((b, i) => bytes[i] === b) ? bytes : null;
+  if (PNG.every((b, i) => bytes[i] === b)) return { bytes, format: "png" };
+  if (RIFF.every((b, i) => bytes[i] === b) && WEBP.every((b, i) => bytes[i + 8] === b)) return { bytes, format: "webp" };
+  return null;
 }
 
 const size = (n: unknown) => (Number.isInteger(n) && (n as number) > 0 && (n as number) <= 4000 ? (n as number) : 0);
@@ -112,14 +122,15 @@ export async function saveRenders(req: Request, env: Env, versionId: number): Pr
     const id = String(b?.id ?? "");
     const width = size(b?.width);
     const height = size(b?.height);
-    const dark = decodePng(b?.dark);
-    const light = decodePng(b?.light);
-    if (!defs.has(id) || !width || !height || !dark || !light || blocks.some((x) => x.id === id)) {
+    const dark = decodePicture(b?.dark);
+    const light = decodePicture(b?.light);
+    if (!defs.has(id) || !width || !height || !dark || !light || dark.format !== light.format || blocks.some((x) => x.id === id)) {
       return Response.json({ error: `A picture for "${id}" isn't one this pack's blocks can have.` }, { status: 400 });
     }
-    blocks.push({ id, name: defs.get(id)!, width, height });
-    for (const [theme, bytes] of [["dark", dark], ["light", light]] as const) {
-      puts.push(env.PACKS.put(`renders/${v.sha256}/${id}.${theme}.png`, bytes, { httpMetadata: { contentType: "image/png" } }));
+    const format = dark.format;
+    blocks.push({ id, name: defs.get(id)!, width, height, ...(format === "webp" ? { format } : {}) });
+    for (const [theme, picture] of [["dark", dark], ["light", light]] as const) {
+      puts.push(env.PACKS.put(`renders/${v.sha256}/${id}.${theme}.${format}`, picture.bytes, { httpMetadata: { contentType: TYPES[format] } }));
     }
   }
   if (!blocks.length) return Response.json({ error: "No pictures." }, { status: 400 });
@@ -130,8 +141,8 @@ export async function saveRenders(req: Request, env: Env, versionId: number): Pr
   return Response.json({ saved: blocks.length });
 }
 
-/** GET /renders/<sha>/<id>.<theme>.png: anyone for a listed version, admins for any. */
-export async function renderFile(env: Env, admin: boolean, sha: string, id: string, theme: string): Promise<Response> {
+/** GET /renders/<sha>/<id>.<theme>.<png|webp>: anyone for a listed version, admins for any. */
+export async function renderFile(env: Env, admin: boolean, sha: string, id: string, theme: string, format: "png" | "webp" = "png"): Promise<Response> {
   if (!admin) {
     const ok = await env.DB.prepare(
       `SELECT 1 FROM versions v JOIN packs p ON p.id = v.pack_id WHERE v.sha256 = ? AND v.status = 'approved' AND p.listed = 1`,
@@ -140,10 +151,10 @@ export async function renderFile(env: Env, admin: boolean, sha: string, id: stri
       .first();
     if (!ok) return new Response("Not found", { status: 404 });
   }
-  const object = await env.PACKS.get(`renders/${sha}/${id}.${theme}.png`);
+  const object = await env.PACKS.get(`renders/${sha}/${id}.${theme}.${format}`);
   if (!object) return new Response("Not found", { status: 404 });
   // The URL carries the render time, so a new render is a new URL.
-  return new Response(object.body, { headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=31536000, immutable" } });
+  return new Response(object.body, { headers: { "Content-Type": TYPES[format], "Cache-Control": "public, max-age=31536000, immutable" } });
 }
 
 async function unrendered(env: Env) {
@@ -198,6 +209,41 @@ export async function redraw(env: Env, versionId?: number): Promise<Response> {
 /** Served as /browse.js: hands packs to the viewer iframes and saves what they render. */
 export const BROWSE_JS = `(function () {
   var root = document.documentElement;
+  // The viewer draws at 2x the screen's own scale; keep 2x and save WebP
+  // (about a fifth of the PNG) where the browser can write it.
+  function shrink(png, width, height) {
+    if (typeof OffscreenCanvas === 'undefined' || !window.createImageBitmap) return Promise.resolve(png);
+    // Decoded by hand: the page's CSP doesn't let fetch() read data: URLs.
+    var raw = atob(png), bytes = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+    return createImageBitmap(new Blob([bytes], { type: 'image/png' }))
+      .then(function (bitmap) {
+        var w = Math.min(bitmap.width, width * 2), h = Math.min(bitmap.height, height * 2);
+        var canvas = new OffscreenCanvas(w, h), g = canvas.getContext('2d');
+        g.imageSmoothingQuality = 'high';
+        g.drawImage(bitmap, 0, 0, w, h);
+        return canvas.convertToBlob({ type: 'image/webp', quality: 0.95 });
+      })
+      .then(function (blob) {
+        if (blob.type !== 'image/webp') return png;
+        return blob.arrayBuffer().then(function (buffer) {
+          var bytes = new Uint8Array(buffer), text = '';
+          for (var i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+          return btoa(text);
+        });
+      })
+      .catch(function () { return png; });
+  }
+  function compact(blocks) {
+    return Promise.all(blocks.map(function (b) {
+      if (!b.dark || !b.light) return b;
+      return Promise.all([shrink(b.dark, b.width, b.height), shrink(b.light, b.width, b.height)]).then(function (both) {
+        // Both themes in one format, or both left as PNG.
+        var webp = both[0] !== b.dark && both[1] !== b.light;
+        return Object.assign({}, b, webp ? { dark: both[0], light: both[1] } : {});
+      });
+    }));
+  }
   var theme = function () { return root.dataset.theme === 'light' ? 'light' : 'dark'; };
   document.querySelectorAll('iframe.pack-viewer').forEach(function (frame) {
     var origin = new URL(frame.src).origin;
@@ -223,7 +269,8 @@ export const BROWSE_JS = `(function () {
       if (m.type === 'blockwork-ready' && !started) { started = true; next(); }
       else if (m.type === 'blockwork-failed') { say(m.reason || 'The viewer stopped.'); }
       else if (m.type === 'blockwork-rendered' && job && job.render) {
-        fetch(job.render, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blocks: m.blocks }) })
+        compact(m.blocks)
+          .then(function (blocks) { return fetch(job.render, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blocks: blocks }) }); })
           .then(function (r) { return r.json().catch(function () { return {}; }).then(function (body) { if (!r.ok) throw new Error(body.error || 'Couldn\\'t save the pictures.'); }); })
           .then(function () { done++; next(); })
           .catch(function (e) { say(e.message); next(); });

@@ -112,8 +112,8 @@ async function route(req: Request, env: Env): Promise<Response> {
   }
   const admin = isAdmin(env, user);
   if (method === "GET" && path === "/") return home(env, user, admin, url.searchParams);
-  if (method === "GET" && (m = path.match(/^\/renders\/([0-9a-f]{64})\/([A-Za-z0-9_-]{1,64})\.(dark|light)\.png$/))) {
-    return renderFile(env, admin, m[1], m[2], m[3]);
+  if (method === "GET" && (m = path.match(/^\/renders\/([0-9a-f]{64})\/([A-Za-z0-9_-]{1,64})\.(dark|light)\.(png|webp)$/))) {
+    return renderFile(env, admin, m[1], m[2], m[3], m[4] as "png" | "webp");
   }
   if ((m = path.match(/^\/packs\/([^/]{1,400})(\/source|\/comments)?$/))) {
     let id = "";
