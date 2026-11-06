@@ -147,6 +147,11 @@ npm test           # pack, api, auth, browse and support tests
 npm run typecheck
 ```
 
+What a pack's blocks can do (the "This pack can" list) comes from
+`src/capabilities.json`, a copy of Blockwork's `blockwork-core/capabilities.json`.
+After a Blockwork change to it, run `node scripts/sync-capabilities.js
+[path/to/Blockwork]`; `npm test` fails while a `../Blockwork` checkout disagrees.
+
 Locally, copy `.dev.vars.example` to `.dev.vars` and fill it in. It points
 the site, the helpdesk (`localhost:8787/support`) and sign-in at localhost and
 makes you an admin.

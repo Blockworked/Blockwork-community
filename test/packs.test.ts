@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { blockIdentifier, capabilities, readPack, slug, stampPack } from "../src/packs.ts";
 
 const enc = (v: unknown) => new TextEncoder().encode(JSON.stringify(v));
@@ -200,4 +200,15 @@ test("uploads get the uploader's name in front of every block ID", () => {
   // Stamping a stamped file changes nothing.
   assert.deepEqual(stampPack(stamped as Uint8Array, "John Doe"), stamped);
   assert.equal(blockIdentifier("", { identifier: "X" }), "Community:X");
+});
+
+test("the capability table matches Blockwork's when a checkout sits beside this one", { skip: !existsSync(new URL("../../Blockwork/blockwork-core/capabilities.json", import.meta.url)) }, () => {
+  const ours = readFileSync(new URL("../src/capabilities.json", import.meta.url), "utf8");
+  const theirs = readFileSync(new URL("../../Blockwork/blockwork-core/capabilities.json", import.meta.url), "utf8");
+  assert.equal(ours, theirs, "run node scripts/sync-capabilities.js");
+});
+
+test("browser blocks and the waiting command count", () => {
+  const blocks = { strands: [{ instructions: [{ id: "1", kind: { BrowserOpen: {} } }, { id: "2", kind: { CommandWait: {} } }] }] };
+  assert.deepEqual(capabilities(blocks), ["commands", "browser"]);
 });

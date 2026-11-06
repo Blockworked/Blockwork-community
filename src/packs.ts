@@ -1,5 +1,7 @@
 // Checks an uploaded block pack and works out what its blocks can do,
-// mirroring blockwork-core's read_pack and blockwork-app's capability scan.
+// mirroring blockwork-core's read_pack and its capability table.
+
+import capabilityTable from "./capabilities.json" with { type: "json" };
 
 export const MAX_PACK_BYTES = 2 * 1024 * 1024;
 
@@ -31,73 +33,11 @@ export type PieceView =
   | { kind: "Input"; name: string; bool: boolean; optional: boolean; value: string | null }
   | { kind: "Branch"; name: string };
 
-// Same order and wording as the app's import review.
-export const CAPABILITIES: [kind: string, label: string, risky: boolean][] = [
-  ["commands", "Runs commands and opens or closes apps", true],
-  ["secrets", "Reads your saved secrets", true],
-  ["network", "Goes online", true],
-  ["files_write", "Writes to files", true],
-  ["files_read", "Reads files and folders", false],
-  ["input", "Presses keys, clicks and moves the mouse", false],
-  ["clipboard", "Reads or changes the clipboard", false],
-  ["windows", "Reads or controls other apps and windows", false],
-  ["triggers", "Starts on its own (schedules, keys, typing, apps, idle, windows, files and more)", false],
-  ["screen", "Reads the screen (colors, images and text)", false],
-  ["macros", "Runs or stops your other macros", false],
-  ["globals", "Reads or changes global variables", false],
-];
-
-const INSTRUCTIONS: Record<string, string[]> = {
-  Command: ["commands"],
-  OpenApp: ["commands"],
-  CloseApp: ["commands"],
-  HttpRequest: ["network"],
-  WriteFile: ["files_write"],
-  Token: ["input"],
-  SetClipboard: ["clipboard"],
-  WhenClipboardChanged: ["clipboard"],
-  WindowAction: ["windows"],
-  MoveWindow: ["windows"],
-  WhenWindow: ["windows"],
-  WhenApp: ["windows"],
-  WhenTyped: ["input"],
-  WhenFileChanged: ["files_read"],
-  RunMacro: ["macros"],
-  StopMacroNamed: ["macros"],
-  FindImage: ["screen"],
-  WaitForImage: ["screen"],
-  DetectObjectsInWindow: ["screen"],
-  WaitForDetection: ["screen"],
-  ClickImage: ["input", "screen"],
-  AimAtDetection: ["input", "screen"],
-  AimStep: ["input"],
-  SetGlobal: ["globals"],
-  ChangeGlobal: ["globals"],
-  PasteText: ["input", "clipboard"],
-};
-
-const OPERATORS: Record<string, string> = {
-  ShellOutput: "commands",
-  ShellSucceeded: "commands",
-  HttpGet: "network",
-  ReadFile: "files_read",
-  FileExists: "files_read",
-  ListDirectory: "files_read",
-  ClipboardText: "clipboard",
-  ClipboardHasImage: "clipboard",
-  ClipboardHasFiles: "clipboard",
-  ActiveWindowTitle: "windows",
-  ActiveWindowApp: "windows",
-  WindowExists: "windows",
-  WindowInfo: "windows",
-  AppRunning: "windows",
-  MacroRunning: "macros",
-  PixelColor: "screen",
-  AverageColor: "screen",
-  ScreenText: "screen",
-  GlobalVariable: "globals",
-  Secret: "secrets",
-};
+// Copied from Blockwork's blockwork-core/capabilities.json (run
+// `node scripts/sync-capabilities.js`), so the review here matches the app's.
+export const CAPABILITIES = capabilityTable.capabilities as [kind: string, label: string, risky: boolean][];
+const BLOCKS: Record<string, string[]> = capabilityTable.blocks;
+const OPERATORS: Record<string, string> = capabilityTable.operators;
 
 /** Lowercase letters, digits and dashes, like blockwork-core's slug. */
 export function slug(text: string): string {
@@ -174,8 +114,7 @@ export function capabilities(blocks: unknown): string[] {
     if ("id" in obj && "kind" in obj) {
       const name = variant(obj.kind);
       if (name) {
-        INSTRUCTIONS[name]?.forEach((c) => found.add(c));
-        if (name.startsWith("When") && name !== "WhenRan") found.add("triggers");
+        BLOCKS[name]?.forEach((c) => found.add(c));
       }
     }
     Object.values(obj).forEach(walk);
