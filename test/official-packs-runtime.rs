@@ -1,3 +1,6 @@
+// Runs the official packs through Blockwork's real parser and interpreter.
+// Not part of `npm test`: `npm run test:runtime -- <Blockwork target/debug/deps>`
+// (scripts/test-pack-runtime.py) compiles and runs it.
 extern crate blockwork_core;
 use blockwork_core::{
     block_packs::{merge_into, read_pack},

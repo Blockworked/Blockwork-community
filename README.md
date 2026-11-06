@@ -88,6 +88,8 @@ definitions were checked against Blockwork's instruction and operator palettes.
 | Text extraction | Text between literal markers, all lines containing text, value for a `key=value` key |
 | Window layouts | Center on a monitor, tile two windows side by side, capture geometry, restore geometry |
 | Mouse patterns | Click a grid, drag through points, click relative to a window |
+| Mouse helpers | Click, double click, right click and drag at a screen position |
+| Text helpers | Check for empty text, get the last letter |
 
 Clipboard tools replace clipboard text after processing it. Line-based blocks
 accept LF, CRLF and CR, and produce LF. Duplicate lines and text markers match
@@ -108,7 +110,9 @@ Drag paths contain at least two `x,y` pairs separated by semicolons, such as
 are in milliseconds. Window-relative clicks use offsets from the client area's
 top-left and focus the window before clicking.
 
-The four packs are generated with stable IDs:
+The first four packs are generated with stable IDs (`build-official-packs.py`
+copies its pack settings from `text-helpers.json`). Mouse helpers and Text
+helpers are edited by hand:
 
 ```bash
 python3 scripts/build-official-packs.py
@@ -139,7 +143,7 @@ Needs Node and a Cloudflare account.
 npm install
 npm run migrate:local && npm run seed:local
 npm run dev        # http://localhost:8787
-npm test           # pack checks
+npm test           # pack, api, auth, browse and support tests
 npm run typecheck
 ```
 

@@ -3,22 +3,17 @@
 // every answer is emailed to whoever filed the ticket, and they can reply by
 // email or on the ticket's page, which the emailed link opens without signing in.
 
-import PostalMime from "postal-mime";
 import { hash, isAdmin, logout, PROVIDERS, randomToken, type User } from "./auth.ts";
 import type { Env } from "./index.ts";
 import { esc, page, type Shell } from "./pages.ts";
 import { commentHtml } from "./comments.ts";
 import {
-  cleanSubject,
   fromAddress,
-  isAutomated,
   isEmail,
   MAX_BODY,
   messageId,
   normalizeEmail,
   sendMail,
-  stripQuoted,
-  ticketFromSubject,
   tidy,
 } from "./support-mail.ts";
 
@@ -26,10 +21,8 @@ export type Status = "open" | "answered" | "closed";
 const STATUS_LABEL: Record<Status, string> = { open: "Waiting on us", answered: "Waiting on you", closed: "Closed" };
 const STAFF_LABEL: Record<Status, string> = { open: "Needs an answer", answered: "Answered", closed: "Closed" };
 
-const NEW_TICKETS_PER_HOUR = 5;
+export const NEW_TICKETS_PER_HOUR = 5;
 const MAX_SUBJECT = 200;
-// Cloudflare hands over at most 25 MiB; a support mail never needs that.
-const MAX_RAW_EMAIL = 5 * 1024 * 1024;
 
 export interface Ticket {
   id: number;
@@ -302,7 +295,7 @@ async function canRead(env: Env, user: User | null, staff: boolean, t: Ticket, k
   return !!key && (await hash(key)) === (await hash(t.access_key));
 }
 
-async function loadTicket(env: Env, id: number): Promise<Ticket | null> {
+export async function loadTicket(env: Env, id: number): Promise<Ticket | null> {
   return env.DB.prepare("SELECT * FROM tickets WHERE id = ?").bind(id).first<Ticket>();
 }
 
@@ -424,75 +417,4 @@ async function queue(env: Env, user: User, wanted: string | null): Promise<Respo
     ? `<ul class="ticket-list">${results.map((t) => ticketRow(env, t, true)).join("")}</ul>`
     : `<p class="muted">${status === "open" ? "Nothing waiting. Nice." : "None."}</p>`;
   return page("Queue", user, true, `<h1>Support queue</h1><nav class="tabs" aria-label="Status">${tabs}</nav>${list}`, 200, shell(env, user, true));
-}
-
-// Email in
-
-interface InboundEmail {
-  from: string;
-  raw: ReadableStream<Uint8Array>;
-  rawSize: number;
-  headers: Headers;
-  setReject(reason: string): void;
-}
-
-/** A message Cloudflare Email Routing delivered to support@: a reply to a ticket, or a new one. */
-export async function receiveEmail(message: InboundEmail, env: Env): Promise<void> {
-  if (message.rawSize > MAX_RAW_EMAIL) {
-    message.setReject("Message too large; please send it without attachments.");
-    return;
-  }
-  if (isAutomated((name) => message.headers.get(name))) return;
-  const parsed = await PostalMime.parse(message.raw);
-  const from = normalizeEmail(parsed.from?.address || message.from);
-  if (!isEmail(from) || from === normalizeEmail(fromAddress(env))) return;
-  const name = (parsed.from?.name ?? "").trim();
-  const emailId = (parsed.messageId ?? "").trim() || null;
-  // A resent message (a retry, or the same mail to two of our addresses) lands once.
-  if (emailId && (await env.DB.prepare("SELECT 1 FROM ticket_messages WHERE email_id = ?").bind(emailId).first())) return;
-  const text = parsed.text?.trim() ? parsed.text : htmlToText(parsed.html ?? "");
-  const attachments = parsed.attachments?.length ?? 0;
-  const note = attachments ? `\n\n(${attachments} attachment${attachments === 1 ? "" : "s"} not kept; ask them to link it instead.)` : "";
-
-  const ticket = await findTicket(env, from, parsed.inReplyTo ?? "", parsed.references ?? "", parsed.subject ?? "");
-  if (ticket) {
-    const body = tidy(stripQuoted(text)) || "(empty reply)";
-    await addMessage(env, ticket, "requester", null, body + note, emailId);
-    return;
-  }
-  const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM tickets WHERE email = ? AND created_at > ?")
-    .bind(from, Date.now() - 3600_000)
-    .first<{ n: number }>();
-  if ((recent?.n ?? 0) >= NEW_TICKETS_PER_HOUR) return;
-  const body = tidy(text) || "(empty message)";
-  await openTicket(env, { subject: cleanSubject(parsed.subject ?? ""), body: body + note, email: from, name, userId: null, emailId });
-}
-
-/** The ticket an email answers: by the ids it replies to, else the [#n] in its subject. Only the requester's own address counts. */
-async function findTicket(env: Env, from: string, inReplyTo: string, references: string, subject: string): Promise<Ticket | null> {
-  const ids = `${inReplyTo} ${references}`.match(/<[^<>\s]+>/g) ?? [];
-  for (const id of ids.reverse().slice(0, 20)) {
-    const row = await env.DB.prepare("SELECT t.* FROM ticket_messages m JOIN tickets t ON t.id = m.ticket_id WHERE m.email_id = ?").bind(id).first<Ticket>();
-    if (row && normalizeEmail(row.email) === from) return row;
-  }
-  const n = ticketFromSubject(subject);
-  if (n) {
-    const row = await loadTicket(env, n);
-    if (row && normalizeEmail(row.email) === from) return row;
-  }
-  return null;
-}
-
-export function htmlToText(html: string): string {
-  return html
-    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, "")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|li|tr|h\d)>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, "&");
 }

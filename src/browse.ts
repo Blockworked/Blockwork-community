@@ -364,3 +364,10 @@ export async function authorPage(env: Env, user: User | null, admin: boolean, pu
      <div class="pack-list">${results.map(listedCard).join("") || `<p class="muted">No packs listed yet.</p>`}</div>`,
   );
 }
+
+/** A pack version as a card in the admin and "My packs" lists. */
+export function packCard(v: VersionRow, extra = ""): string {
+  return `<div class="card"><h3>${esc(v.name)} <span class="version">${esc(v.version)}</span></h3>
+    <p class="muted by">by ${esc(v.author)}${v.owner_id === OFFICIAL_OWNER ? verifiedBadge() : ""}</p><p>${esc(v.description)}</p>
+    ${blockPictures(v)}${capabilityList(JSON.parse(v.capabilities))}${extra}</div>`;
+}
