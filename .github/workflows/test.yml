@@ -18,3 +18,25 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+
+  # Checks against Blockwork at the commit in .blockwork-rev: the capability
+  # table copy and every official pack run by Blockwork's real runner.
+  blockwork:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Fetch Blockwork
+        run: |
+          git init -q ../Blockwork
+          git -C ../Blockwork fetch -q --depth 1 https://github.com/Blockworked/Blockwork "$(cat .blockwork-rev)"
+          git -C ../Blockwork -c advice.detachedHead=false checkout -q FETCH_HEAD
+      - run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends pkg-config libssl-dev libxdo-dev
+      - run: node scripts/sync-capabilities.js --check
+      - name: Build Blockwork's runner
+        working-directory: ../Blockwork
+        run: cargo build -p blockwork-core --no-default-features --features system
+      - run: npm run test:runtime -- ../Blockwork/target/debug/deps

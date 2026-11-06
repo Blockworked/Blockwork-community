@@ -128,8 +128,12 @@ npm run test:runtime -- /path/to/Blockwork/target/debug/deps
 ```
 
 These tests simulate clipboard/window I/O and record mouse events without
-controlling the desktop. They cover all 13 new blocks, Unicode and literal
+controlling the desktop. They cover all 13 official blocks, Unicode and literal
 matching, line endings, invalid inputs, monitor offsets and action order.
+
+CI runs them, and `node scripts/sync-capabilities.js --check`, against the
+Blockwork commit in `.blockwork-rev`. Move that commit when Blockwork's
+runner or capability table changes.
 
 Reviewers: read the whole pack. The review page lists what its blocks can
 do, but a pack in this library should not run commands, go online, write
