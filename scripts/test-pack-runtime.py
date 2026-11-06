@@ -13,9 +13,12 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('deps', type=Path, help='Blockwork target/debug/deps directory')
 args = parser.parse_args()
 deps = args.deps.resolve()
-libraries = sorted(deps.glob('libblockwork_core-*.rlib'), key=lambda p: p.stat().st_mtime, reverse=True)
+libraries = list(deps.glob('libblockwork_core-*.rlib'))
 if not libraries:
     parser.error('Build blockwork-core first; no libblockwork_core-*.rlib found.')
+if len(libraries) > 1:
+    # Builds with different features sit side by side; which one is meant can't be guessed.
+    parser.error('Several libblockwork_core-*.rlib builds in %s; clean it and build blockwork-core once.' % deps)
 root = Path(__file__).resolve().parent.parent
 with tempfile.TemporaryDirectory(prefix='blockwork-pack-tests-') as directory:
     executable = str(Path(directory) / 'pack-runtime-tests')
