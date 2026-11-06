@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "migrate:local": "wrangler d1 migrations apply blockwork-library --local",
-    "migrate:remote": "wrangler d1 migrations apply blockwork-library --remote",
+    "migrate:local": "wrangler d1 migrations apply DB --local",
+    "migrate:remote": "wrangler d1 migrations apply DB --remote",
     "seed:local": "node scripts/seed.js --local",
     "seed:remote": "node scripts/seed.js --remote",
     "typecheck": "tsc --noEmit",

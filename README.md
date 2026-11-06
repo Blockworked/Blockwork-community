@@ -147,16 +147,9 @@ npm test           # pack, api, auth, browse and support tests
 npm run typecheck
 ```
 
-Locally, put the secrets in `.dev.vars`:
-
-```
-SITE_URL=http://localhost:8787
-ADMINS=github:<your GitHub user id>
-GITHUB_CLIENT_ID=...
-GITHUB_CLIENT_SECRET=...
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-```
+Locally, copy `.dev.vars.example` to `.dev.vars` and fill it in. It points
+the site, the helpdesk (`localhost:8787/support`) and sign-in at localhost and
+makes you an admin.
 
 ## The app's API
 
@@ -194,9 +187,8 @@ Setting it up once:
 - `COOKIE_DOMAIN = "blockworked.com"` makes sign-ins cover the helpdesk; people
   signed in before it sign in once more to use the helpdesk.
 
-Locally: `npx wrangler dev --var SITE_URL:http://community.blockworked.com
---var SUPPORT_URL:http://community.blockworked.com/support --var
-COOKIE_DOMAIN:`, then the helpdesk is at `localhost:8787/support`, and
+Locally, with `.dev.vars` from above, the helpdesk is at
+`localhost:8787/support`, and
 `curl -X POST "localhost:8787/cdn-cgi/handler/email?from=a@example.com&to=support@blockworked.com" --data-binary @mail.eml`
 delivers an email to it.
 
@@ -204,7 +196,9 @@ delivers an email to it.
 
 1. `npx wrangler d1 create blockwork-library` and put the id in
    `wrangler.toml`; `npx wrangler r2 bucket create blockwork-library`.
-2. Set `SITE_URL` and `ADMINS` in `wrangler.toml`.
+2. Set `SITE_URL` and `ADMINS` in `wrangler.toml`. Adding an admin or
+   changing who is told about tickets (`SUPPORT_NOTIFY`) is an edit there and
+   a deploy.
 3. Create a GitHub OAuth app and a Google OAuth client with callbacks
    `<SITE_URL>/auth/github/callback` and `<SITE_URL>/auth/google/callback`,
    then `npx wrangler secret put` each of the four client values.

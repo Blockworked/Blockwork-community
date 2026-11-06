@@ -1,6 +1,6 @@
 // The top nav, footer and page-to-page fade shared with blockworked.com, so
 // the two sites read as one. This is a copy: blockworked.com
-// (EthanRStokes/blockworked.com) keeps the originals in src/lib/site.ts (the
+// (Blockworked/blockworked.com) keeps the originals in src/lib/site.ts (the
 // link list), src/components/SiteHeader.astro and SiteFooter.astro (markup
 // and styles) and src/layouts/Base.astro (the theme and fade scripts). Change
 // both together.
