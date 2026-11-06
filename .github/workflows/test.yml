@@ -20,7 +20,8 @@ jobs:
       - run: npm test
 
   # Checks against Blockwork at the commit in .blockwork-rev: the capability
-  # table copy and every official pack run by Blockwork's real runner.
+  # table copy, the slug cases and every official pack run by Blockwork's real
+  # runner.
   blockwork:
     runs-on: ubuntu-latest
     steps:
@@ -28,6 +29,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
       - uses: dtolnay/rust-toolchain@stable
       - name: Fetch Blockwork
         run: |
@@ -36,6 +38,9 @@ jobs:
           git -C ../Blockwork -c advice.detachedHead=false checkout -q FETCH_HEAD
       - run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends pkg-config libssl-dev libxdo-dev
       - run: node scripts/sync-capabilities.js --check
+      - run: npm ci
+      # With Blockwork beside it, the tests that compare against its files run.
+      - run: npm test
       - name: Build Blockwork's runner
         working-directory: ../Blockwork
         run: cargo build -p blockwork-core --no-default-features --features system

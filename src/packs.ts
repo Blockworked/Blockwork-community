@@ -42,9 +42,11 @@ const OPERATORS: Record<string, string> = capabilityTable.operators;
 /** Lowercase letters, digits and dashes, like blockwork-core's slug. */
 export function slug(text: string): string {
   let out = "";
-  for (const c of text.trim()) {
+  // Lowercased a character at a time before the test, as Rust's
+  // `char::to_lowercase` does (so "İ" becomes "i" plus a dot that splits).
+  for (const c of Array.from(text.trim(), (ch) => ch.toLowerCase()).join("")) {
     if (/[\p{Alphabetic}\p{N}]/u.test(c)) {
-      out += c.toLowerCase();
+      out += c;
     } else if (out && !out.endsWith("-")) {
       out += "-";
     }
