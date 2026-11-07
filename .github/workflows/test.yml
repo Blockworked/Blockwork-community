@@ -36,7 +36,7 @@ jobs:
           git init -q ../Blockwork
           git -C ../Blockwork fetch -q --depth 1 https://github.com/Blockworked/Blockwork "$(cat .blockwork-rev)"
           git -C ../Blockwork -c advice.detachedHead=false checkout -q FETCH_HEAD
-      - run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends pkg-config libssl-dev libxdo-dev
+      - run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends pkg-config libssl-dev libxdo-dev libxkbcommon-dev
       - run: node scripts/sync-capabilities.js --check
       - run: npm ci
       # With Blockwork beside it, the tests that compare against its files run.
