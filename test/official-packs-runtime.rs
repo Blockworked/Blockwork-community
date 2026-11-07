@@ -8,7 +8,7 @@ use blockwork_core::{
         types::{Axis, Direction, MacroButton, MacroKey},
         value::{Evaluated, ExtOperator, Op, Value, register_operators},
     },
-    macros::{BlockKind, Instruction, InstructionKind as K, Macro, backend::InputBackend},
+    macros::{BlockKind, Instruction, InstructionKind as K, Macro, Run, backend::InputBackend},
 };
 use std::{
     collections::HashMap,

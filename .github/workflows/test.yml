@@ -43,5 +43,5 @@ jobs:
       - run: npm test
       - name: Build Blockwork's runner
         working-directory: ../Blockwork
-        run: cargo build -p blockwork-core --no-default-features --features system
+        run: cargo build -p blockwork-core --no-default-features
       - run: npm run test:runtime -- ../Blockwork/target/debug/deps
