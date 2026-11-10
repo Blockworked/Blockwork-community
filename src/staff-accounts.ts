@@ -4,7 +4,7 @@ import { cookies, hash, type User } from './auth.ts';
 import { isStaff } from './support.ts';
 import { esc } from './pages.ts';
 import { accountPage } from './account-views.ts';
-import { boundedBody, limit, makeFlow, readFlow, recentProof } from './account-security.ts';
+import { SECURITY_IDLE_MS, SECURITY_MAX_MS, boundedBody, limit, makeFlow, readFlow, securityProof } from './account-security.ts';
 import { notify, sendAccountToken } from './account-mail.ts';
 
 interface Target { id: string; public_id: string; name: string; banned: number; email: string | null }
@@ -18,8 +18,8 @@ function view(env: Env, user: User, html: string, status = 200): Response {
 }
 export async function staffAccounts(req: Request, env: Env, user: User | null, ctx?: Pick<ExecutionContext, 'waitUntil'>): Promise<Response> {
   if (!user || !isStaff(env, user)) return new Response('Not found', {status: 404});
-  if (!await recentProof(req, env, user, true)) return view(env, user,
-    '<p>Support recovery requires a passkey or authenticator-app sign-in within the last five minutes. Enroll MFA in Account security, then sign in again.</p><p><a href="/account">Account security</a> · <a href="/login?next=%2Fstaff%2Faccounts">Sign in again</a></p>', 403);
+  if (!await securityProof(req, env, user, true)) return view(env, user,
+    '<p>Support recovery requires MFA and an unlocked security-settings session. Enroll MFA in Account security, then unlock settings to continue.</p><p><a href="/account">Account security</a> · <a href="/account/unlock?next=%2Fstaff%2Faccounts">Unlock settings</a></p>', 403);
   const path = new URL(req.url).pathname;
   if (req.method === 'GET' && path === '/staff/accounts') return view(env, user, `<p>Find an account in connection with a support ticket. Actions are audited. Recovery emails go only to the account's existing verified address.</p>
     <form method="post" action="/staff/accounts/lookup"><p><label>Ticket number <input type="text" inputmode="numeric" name="ticket" pattern="[0-9]+" required></label></p>
@@ -42,7 +42,7 @@ export async function staffAccounts(req: Request, env: Env, user: User | null, c
   const action = path.endsWith('/reset') ? 'reset_email' : path.endsWith('/revoke') ? 'revoke' : 'lookup';
   if (action === 'revoke') {
     const token = await makeFlow(env, 'support-revoke', target.id, {});
-    if (!await recentProof(req, env, user, true)) return view(env, user, '<p>Sign in again before continuing.</p>', 403);
+    if (!await securityProof(req, env, user, true)) return view(env, user, '<p>Unlock security settings before continuing.</p>', 403);
     const flow = await readFlow(env, token, 'support-revoke');
     if (!flow) return view(env, user, '<p>Account changed. Look it up again.</p>', 409);
     const sessionHashes = await Promise.all(cookies(req, 'session').slice(0, 2).map(hash));
@@ -51,8 +51,8 @@ export async function staffAccounts(req: Request, env: Env, user: User | null, c
     const results = await env.DB.batch([
       env.DB.prepare(`UPDATE users SET auth_version = auth_version + 1 WHERE id = ? AND auth_version = ?
         AND EXISTS (SELECT 1 FROM auth_flows WHERE token_hash = ? AND expires_at > ?)
-        AND EXISTS (SELECT 1 FROM sessions WHERE user_id = ? AND token_hash IN (?, ?) AND kind = 'web' AND auth_strength IN ('strong', 'totp') AND created_at > ? AND expires_at > ?)`)
-        .bind(target.id, flow.auth_version, flow.token_hash, now, user.id, sessionHashes[0] ?? '', sessionHashes[1] ?? '', now - 300000, now),
+        AND EXISTS (SELECT 1 FROM sessions WHERE user_id = ? AND token_hash IN (?, ?) AND kind = 'web' AND auth_strength IN ('strong', 'totp') AND security_unlocked_at > ? AND security_last_used_at > ? AND expires_at > ?)`)
+        .bind(target.id, flow.auth_version, flow.token_hash, now, user.id, sessionHashes[0] ?? '', sessionHashes[1] ?? '', now - SECURITY_MAX_MS, now - SECURITY_IDLE_MS, now),
       env.DB.prepare(`DELETE FROM sessions WHERE user_id = ? AND ${guard}`).bind(target.id, flow.token_hash, now, flow.auth_version + 1),
       env.DB.prepare(`DELETE FROM app_codes WHERE user_id = ? AND ${guard}`).bind(target.id, flow.token_hash, now, flow.auth_version + 1),
       env.DB.prepare(`INSERT INTO support_recovery_audit (actor_id, target_id, action, ticket_id, reason, created_at) SELECT ?, ?, 'revoke', ?, ?, ? WHERE ${guard}`)

@@ -22,7 +22,7 @@ session store are required.
   and account-bound authenticated data. Enrollment proofs contain encrypted
   seeds too. Codes accept at most one time step of clock drift in either
   direction; accepted time steps cannot be replayed. Verification is limited per
-  account and IP. App replacement requires recent authentication and revokes
+  account and IP. App replacement requires unlocked security settings and revokes
   other sessions; removing the last enrolled factor is refused.
 - Add email credentials to an existing provider account through **Account
   security → Verify email**, while recently signed in. Finish verification in
@@ -37,7 +37,13 @@ session store are required.
   successful primary sign-in. Generating new codes invalidates the previous set.
   A recovery session can enroll a replacement passkey or authenticator app. The
   last factor cannot be removed; add its replacement first.
-- Security changes require authentication within five minutes. Enrollment and
+- Account security is unlocked once with a password plus enrolled MFA, a passkey,
+  or an already-connected provider plus enrolled MFA. The unlock belongs only to
+  that browser session. It lasts 30 minutes without security-setting activity
+  and at most one hour total; **Lock security settings** ends it immediately.
+  A full sign-in directed to Account security also unlocks it. Ordinary older
+  sessions are redirected to the unlock prompt on entry. Individual actions no
+  longer require a sign-in in the last five minutes. Enrollment and
   passkey removal revoke other sessions and app authorization codes. The new
   authenticator gets a fresh browser session after enrollment; removal requires
   signing in again. **Sign out all browsers and apps** revokes pending proofs too.
@@ -45,11 +51,62 @@ session store are required.
   authenticator apps and backup codes has no automated way to remove MFA. Support must not override
   this based solely on email access.
 
+## Change linked email
+
+Use **Account security → Change linked email**. Both the current and proposed
+addresses receive separate, single-use confirmations valid for one hour. The
+current mailbox also receives a cancellation link. Opening a link is read-only:
+email scanners cannot approve or cancel a request. The owner must explicitly
+confirm both mailboxes, then finish the change from unlocked security settings.
+A mailbox confirmation never signs someone in or changes the address by itself.
+
+The old address remains active until finalization. Finalization checks current
+ownership, credential generation, both confirmations, unique address ownership
+and the active browser's unlock in one D1 transaction. It invalidates other
+browser/app sessions, authorization codes and pending recovery proofs, retains
+the password and MFA credentials, and rotates the current browser session while
+preserving the original settings unlock deadline. Both addresses receive a
+completion notice. Replacing a pending request invalidates its earlier links;
+failed delivery cancels the pending change. An address on another account cannot
+be used to merge accounts. Owners must retain access to the current mailbox;
+support cannot substitute a new recovery address.
+
+## Connect and disconnect provider sign-ins
+
+**Connected sign-in accounts** supports one Google identity and one GitHub
+identity per account. Connection starts only from a protected POST in unlocked
+settings, completes OAuth, then asks the owner to confirm the provider identity.
+The flow is tied to that browser session, account and credential generation.
+Account IDs, roles, packs, support tickets and MFA remain with the original
+account. Identities belonging to another account cannot be connected or moved.
+Provider profile email addresses never automatically link or merge accounts.
+
+OAuth uses hashed, one-time state, a host-only SameSite=Lax cookie, PKCE S256,
+exact callback addresses and minimum profile scopes. Google ID tokens are also
+verified against its public signing keys, including issuer, audience, expiry,
+nonce and matching userinfo subject. Tokens are used only for sign-in verification
+and discarded; no provider access/refresh tokens are stored.
+
+Disconnect requires another usable primary sign-in: verified email/password,
+a passkey, or another connected provider. TOTP and backup codes alone do not
+count. Removing the last passkey also checks this rule. Connection changes are
+atomic, revoke other sessions and pending proofs, retain the current settings
+session deadline, and notify the verified account email when one exists. The
+account activity table records successful changes without bearer secrets.
+Disconnect removes a sign-in connection in Blockworked; users can also revoke
+profile permissions from the provider's own connected-app settings.
+
+Migration `0014_account_connections.sql` backfills existing provider IDs into
+explicit identity mappings without changing canonical account IDs or admin IDs.
+A disconnected provider signing in again creates a separate account if its old
+ID still exists. It cannot silently regain access to the earlier account.
+In-flight OAuth sign-ins started before this migration must be restarted.
+
 ## Support recovery without impersonation
 
 Staff and administrators have **Account recovery** in the helpdesk navigation.
 The tool runs on the canonical community origin at `/staff/accounts` and requires
-an MFA sign-in within five minutes. A password/provider session alone or a
+an MFA-authenticated session with security settings unlocked. A password/provider session alone or a
 backup-code recovery session does not grant access to staff recovery tools.
 
 Every lookup and action requires a related ticket and a reason. Staff see masked
@@ -107,8 +164,8 @@ proofs, rate-limit buckets, sessions and app codes.
 
 ## Rollout
 
-1. Apply D1 migrations `0012_local_accounts.sql` and
-   `0013_totp_and_support_recovery.sql` **before deploying this code**:
+1. Apply D1 migrations `0012_local_accounts.sql`,
+   `0013_totp_and_support_recovery.sql` and `0014_account_connections.sql` **before deploying this code**:
    `npm run migrate:remote`. The updated provider and desktop login code uses
    the new schema even while local signup is disabled. Take the normal database
    backup before migration and verify on staging first.
@@ -145,13 +202,15 @@ proofs, rate-limit buckets, sessions and app codes.
 
 `npm run typecheck` and `npm test` include real SQLite transactions, signed
 WebAuthn fixtures, missing-verification/wrong-origin/signature failures,
-one-time replay checks, owner-bound linking, reset revocation, encrypted-seed
+one-time replay checks, mailbox changes, OAuth linking/unlinking, settings unlocks,
+owner-bound linking, reset revocation, encrypted-seed
 binding, TOTP replay protection, and staff permissions/recovery audits.
 
 `npm run test:browser` builds the production Worker, runs it in workerd with D1,
 and drives a Chromium virtual authenticator through signup, passkey enrollment,
 password + passkey MFA, direct passkey login, backup codes, password reset,
-authenticator-app enrollment and six-digit-code login.
+authenticator-app enrollment, six-digit-code login, settings re-authentication,
+provider connection confirmation and linked-email changes.
 Outbound email and breach queries are simulated locally. Install Chromium with
 `npx playwright install chromium` or point `CHROMIUM_PATH` to an existing binary.
 The test uses only local ephemeral storage and never sends real email.

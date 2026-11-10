@@ -173,7 +173,7 @@ test('passkeys reject the wrong origin, missing device verification and changed 
   }
 });
 
-test('security settings require recent authentication, and credential linking requires the requesting owner', async t => {
+test('security settings require an active unlock, and credential linking requires the requesting owner', async t => {
   const mail = mockMail(t), f = fixture();
   const session = await userSession(f, 'github:123');
   assert.equal((await f.request('/account/email', {email: 'linked@example.com'}, session)).status, 200);
@@ -183,7 +183,7 @@ test('security settings require recent authentication, and credential linking re
   assert.equal((await f.request('/auth/email/verify', {token, password}, other)).status, 401);
   assert.equal((await f.request('/auth/email/verify', {token, password}, session)).status, 200);
   assert.equal(f.sql.prepare('SELECT user_id FROM email_credentials').get()!.user_id, 'github:123');
-  f.sql.prepare('UPDATE sessions SET created_at = 0').run();
+  f.sql.prepare('UPDATE sessions SET security_last_used_at = 0').run();
   assert.equal((await f.request('/account/password', {password}, session)).status, 401);
   assert.equal((await f.request('/account/revoke', {}, session)).status, 401);
 });

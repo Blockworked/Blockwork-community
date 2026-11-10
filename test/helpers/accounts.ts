@@ -3,13 +3,15 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { generateKeyPairSync, createHash, sign } from 'node:crypto';
 import { isoCBOR } from '@simplewebauthn/server/helpers';
 import type { Env } from '../../src/index.ts';
+import { login, callback } from '../../src/oauth.ts';
 import { localAuth } from '../../src/local-auth.ts';
 
 /** Real SQLite constraints, RETURNING, and transactions behind the D1 interface. */
-export function fixture() {
+export function fixture(beforeConnections?: (sql: DatabaseSync) => void) {
   const sql = new DatabaseSync(':memory:');
   sql.exec('PRAGMA foreign_keys = ON');
   for (const file of readdirSync(new URL('../../migrations/', import.meta.url)).filter(f => f.endsWith('.sql')).sort()) {
+    if (file.startsWith('0014_')) beforeConnections?.(sql);
     sql.exec(readFileSync(new URL('../../migrations/' + file, import.meta.url), 'utf8'));
   }
   class Statement {
@@ -27,7 +29,12 @@ export function fixture() {
   }};
   const env = {DB: db, SITE_URL: 'https://community.example.com', ADMINS: '', LOCAL_AUTH_ENABLED: 'true', AUTH_TOTP_KEY: 'A'.repeat(43), SMTP2GO_API_KEY: 'test', COOKIE_DOMAIN: 'example.com'} as unknown as Env;
   async function request(path: string, body?: object, cookie = '', origin = env.SITE_URL) {
-    const response = await localAuth(new Request(env.SITE_URL + path, body ? {method: 'POST', headers: {Origin: origin, Cookie: cookie, 'Content-Type': 'application/json'}, body: JSON.stringify(body)} : {headers: {Cookie: cookie}}), env);
+    const req = new Request(env.SITE_URL + path, body ? {method: 'POST', headers: {Origin: origin, Cookie: cookie, 'Content-Type': 'application/json'}, body: JSON.stringify(body)} : {headers: {Cookie: cookie}});
+    let response = await localAuth(req, env);
+    if (!response) {
+      const match = /^\/auth\/(github|google)\/(login|callback)$/.exec(new URL(req.url).pathname);
+      if (match) response = match[2] === 'login' ? await login(env, match[1] as 'github' | 'google', new URL(req.url).searchParams.get('next')) : await callback(req, env, match[1] as 'github' | 'google');
+    }
     if (!response) throw new Error('No account route');
     return response;
   }

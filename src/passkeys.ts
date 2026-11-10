@@ -3,7 +3,7 @@ import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthe
 import type { Env } from './index.ts';
 import { notify } from './account-mail.ts';
 import { currentUser, hash, safeNext } from './auth.ts';
-import { flowCookie, flowToken, hex, issueSession, makeFlow, readFlow, recentProof, unhex, type Flow } from './account-security.ts';
+import { flowCookie, flowToken, hex, issueSession, makeFlow, readFlow, securityProof, securitySession, unhex, type Flow } from './account-security.ts';
 
 interface Key { id: string; user_id: string; public_key: string; counter: number; transports: string; label: string; auth_version: number }
 export function json(data: unknown, status = 200, token?: string): Response {
@@ -17,11 +17,11 @@ function rp(env: Env): { rpID: string; expectedOrigin: string } {
   return {rpID: url.hostname, expectedOrigin: url.origin};
 }
 /** The session insert checks the credential generation captured before verification. */
-async function complete(env: Env, flow: Flow, id: string, strength: string, next: string): Promise<Response> {
+async function complete(env: Env, flow: Flow, id: string, strength: string, next: string, unlockedAt?: number): Promise<Response> {
   if (flow.user_id && flow.user_id !== id) return fail();
   const user = await env.DB.prepare('SELECT auth_version FROM users WHERE id = ? AND banned = 0').bind(id).first<{auth_version: number}>();
   if (!user || (flow.user_id && user.auth_version !== flow.auth_version)) return fail();
-  const res = await issueSession(env, id, user.auth_version, strength, next);
+  const res = await issueSession(env, id, user.auth_version, strength, next, unlockedAt);
   if (res.status !== 303) return fail();
   const headers = new Headers(res.headers);
   headers.delete('Location');
@@ -61,7 +61,8 @@ export async function passkeyRoute(req: Request, env: Env, path: string, body: R
   }
   if (path === '/auth/passkey/register-options' || path === '/auth/passkey/register-verify') {
     const user = await currentUser(req, env);
-    if (!user || !await recentProof(req, env, user)) return json({error: 'Sign in again before changing security settings.'}, 401);
+    const proof = user ? await securitySession(req, env, user) : null;
+    if (!user || !proof) return json({error: 'Unlock Account security before changing security settings.'}, 401);
     if (path.endsWith('register-options')) {
       const keys = await env.DB.prepare('SELECT id FROM passkeys WHERE user_id = ?').bind(user.id).all<Key>();
       if (keys.results.length >= 10) return json({error: 'You can register up to 10 passkeys.'}, 400);
@@ -71,7 +72,7 @@ export async function passkeyRoute(req: Request, env: Env, path: string, body: R
         attestationType: 'none', authenticatorSelection: {residentKey: 'required', userVerification: 'required'},
         excludeCredentials: keys.results.map(k => ({id: k.id})), supportedAlgorithmIDs: [-7, -257]});
       const token = await makeFlow(env, 'passkey-register', user.id, {challenge: options.challenge, label: String(body.label || 'Passkey').slice(0, 80)});
-      if (!await recentProof(req, env, user)) return fail();
+      if (!await securityProof(req, env, user)) return fail();
       return json(options, 200, token);
     }
     const flow = await readFlow(env, flowToken(req, '__Host-passkey-flow'), 'passkey-register', true);
@@ -93,7 +94,7 @@ export async function passkeyRoute(req: Request, env: Env, path: string, body: R
       ]);
       if (results[0].meta.changes !== 1) return fail();
       await notify(env, user.id, 'A passkey was added to your Blockworked account. Other browsers and apps have been signed out. Save backup codes in Account security.');
-      return complete(env, {...flow, auth_version: flow.auth_version + 1}, user.id, 'strong', '/account?enrolled=1');
+      return complete(env, {...flow, auth_version: flow.auth_version + 1}, user.id, 'strong', '/account?enrolled=1', proof.security_unlocked_at);
     } catch { return fail(); }
   }
   if (path === '/auth/backup/verify') {

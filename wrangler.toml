@@ -10,7 +10,7 @@ routes = [
 ]
 
 [vars]
-# Enable after following docs/accounts.md; this requires migrations 0012/0013 even when disabled.
+# Enable after following docs/accounts.md; this requires migrations 0012–0014 even when disabled.
 LOCAL_AUTH_ENABLED = "true"
 AUTH_FROM = "noreply@blockworked.com"
 # The address the site is served at; OAuth callbacks go to <SITE_URL>/auth/<provider>/callback.

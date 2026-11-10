@@ -4,7 +4,7 @@ import type { Env } from './index.ts';
 import { type User } from './auth.ts';
 import { esc } from './pages.ts';
 import { accountPage } from './account-views.ts';
-import { flowCookie, flowToken, issueSession, limit, makeFlow, readFlow, recentProof, unhex, hex } from './account-security.ts';
+import { flowCookie, flowToken, issueSession, limit, makeFlow, readFlow, securityProof, securitySession, unhex, hex } from './account-security.ts';
 import { notify } from './account-mail.ts';
 import { json } from './passkeys.ts';
 
@@ -66,12 +66,13 @@ export async function totpRoute(req: Request, env: Env, path: string, body: Reco
     if (results[0].meta.changes !== 1) return fail();
     return sessionJson(env, flow.user_id, flow.auth_version, JSON.parse(flow.data).next);
   }
-  if (!user || !await recentProof(req, env, user)) return json({error: 'Sign in again before changing your authenticator app.'}, 401);
+  const proof = user ? await securitySession(req, env, user) : null;
+  if (!user || !proof) return json({error: 'Unlock Account security before changing your authenticator app.'}, 401);
   if (path === '/account/totp/setup') {
     const secret = new OTPAuth.Secret({size: 20}).base32;
     const encrypted = await sealSecret(env, user.id, secret);
     const token = await makeFlow(env, 'totp-enroll', user.id, {encrypted}, 600);
-    if (!await recentProof(req, env, user)) return fail();
+    if (!await securityProof(req, env, user)) return fail();
     const qr = qrcode(0, 'M');
     qr.addData(totp(secret, user.name).toString()); qr.make();
     const response = accountPage(user, env, 'Set up an authenticator app', `<p>Scan this code in an authenticator app such as Aegis, 2FAS, Google Authenticator, or Microsoft Authenticator.</p>
@@ -103,12 +104,12 @@ export async function totpRoute(req: Request, env: Env, path: string, body: Reco
     ]);
     if (results[0].meta.changes !== 1) return fail();
     await notify(env, user.id, 'An authenticator app was enabled or replaced on your Blockworked account. Other browsers and apps have been signed out. Save backup codes in Account security.');
-    return issueSession(env, user.id, flow.auth_version + 1, 'totp', '/account');
+    return issueSession(env, user.id, flow.auth_version + 1, 'totp', '/account', proof.security_unlocked_at);
   }
   if (path === '/account/totp/delete') {
     if (!await env.DB.prepare('SELECT 1 FROM passkeys WHERE user_id = ?').bind(user.id).first()) return fail('Add a passkey before removing your last authenticator app. You can replace the app by setting up a new one.');
     const token = await makeFlow(env, 'totp-delete', user.id, {});
-    if (!await recentProof(req, env, user)) return fail();
+    if (!await securityProof(req, env, user)) return fail();
     const flow = await readFlow(env, token, 'totp-delete');
     if (!flow) return fail();
     const guard = 'EXISTS (SELECT 1 FROM auth_flows WHERE token_hash = ? AND expires_at > ?)';

@@ -3,7 +3,8 @@
 
 import { AuthBusyError } from "./account-security.ts";
 import { localAuth } from "./local-auth.ts";
-import { callback, currentUser, shareSession, isAdmin, login, logout, PROVIDERS, type Provider, type User } from "./auth.ts";
+import { login, callback } from "./oauth.ts";
+import { currentUser, shareSession, isAdmin, logout, PROVIDERS, type Provider, type User } from "./auth.ts";
 import { esc, loginPage, message, page } from "./pages.ts";
 import { authorPage, home, packCard, packPage, published, sourcePage, withBlockViews, type VersionRow } from "./browse.ts";
 import { deleteComment, postComment } from "./comments.ts";
@@ -79,6 +80,7 @@ export default {
       env.DB.prepare("DELETE FROM auth_limits WHERE expires_at <= ?").bind(Date.now()),
       env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(Date.now()),
       env.DB.prepare("DELETE FROM app_codes WHERE expires_at <= ?").bind(Date.now()),
+      env.DB.prepare("DELETE FROM email_changes WHERE expires_at <= ? OR auth_version != (SELECT auth_version FROM users WHERE id = email_changes.user_id)").bind(Date.now()),
     ]);
   },
 

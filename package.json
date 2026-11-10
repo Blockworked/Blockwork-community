@@ -24,6 +24,7 @@
   "dependencies": {
     "@noble/hashes": "^2.4.0",
     "@simplewebauthn/server": "^14.1.0",
+    "jose": "^6.2.17",
     "otpauth": "^9.6.0",
     "postal-mime": "^2.4.4",
     "qrcode-generator": "^2.0.4"

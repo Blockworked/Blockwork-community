@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { totp } from '../src/totp.ts';
@@ -14,12 +15,20 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
   const compile = spawnSync(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'deploy', '--dry-run', '--outdir', build], {encoding: 'utf8'});
   assert.equal(compile.status, 0, compile.stderr);
   const mail: any[] = [];
+  let providerChallenge = '';
+  let origin = '';
   const options = {
     rootPath: build, modulesRoot: build, modules: [{type: 'ESModule', path: join(build, 'index.js')}], compatibilityDate: '2026-10-01',
     d1Databases: ['DB'], r2Buckets: ['PACKS'],
-    bindings: {SITE_URL: 'http://localhost', ADMINS: '', LIBRARY_NAME: 'Test community', LOCAL_AUTH_ENABLED: 'true', AUTH_TOTP_KEY: 'A'.repeat(43), SMTP2GO_API_KEY: 'test'},
+    bindings: {SITE_URL: 'http://localhost', ADMINS: '', LIBRARY_NAME: 'Test community', LOCAL_AUTH_ENABLED: 'true', AUTH_TOTP_KEY: 'A'.repeat(43), SMTP2GO_API_KEY: 'test', GITHUB_CLIENT_ID: 'test-client', GITHUB_CLIENT_SECRET: 'test-secret'},
     outboundService: async (req: Request) => {
       const url = new URL(req.url);
+      if (url.href === 'https://github.com/login/oauth/access_token') {
+        const data = await req.json();
+        assert.equal(createHash('sha256').update(data.code_verifier).digest('base64url'), providerChallenge);
+        return Response.json({access_token: 'test-access'});
+      }
+      if (url.href === 'https://api.github.com/user') return Response.json({id: 987654321, login: 'linked-github', name: 'Linked GitHub'});
       if (url.hostname === 'api.pwnedpasswords.com') return new Response('0'.repeat(35) + ':0');
       if (url.hostname === 'api.smtp2go.com') { mail.push(await req.json()); return Response.json({data: {succeeded: 1, failed: 0}}); }
       return new Response('Unexpected outbound request', {status: 502});
@@ -29,14 +38,28 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
   let browser;
   try {
     const ready = await mf.ready;
-    const origin = `http://localhost:${ready.port}`;
+    origin = `http://localhost:${ready.port}`;
     await mf.setOptions(convertV4MiniflareOptions({...options, port: Number(ready.port), bindings: {...options.bindings, SITE_URL: origin}}));
     const db = await mf.getD1Database('DB');
     for (const file of readdirSync('migrations').filter(f => f.endsWith('.sql')).sort()) {
-      for (const statement of readFileSync(join('migrations', file), 'utf8').replace(/--[^\n]*/g, '').split(';').map(s => s.trim()).filter(Boolean)) await db.prepare(statement).run();
+      const lines = readFileSync(join('migrations', file), 'utf8').replace(/--[^\n]*/g, '').split('\n');
+      let statement = '', trigger = false;
+      for (const line of lines) {
+        if (/^\s*CREATE TRIGGER\b/i.test(line)) trigger = true;
+        statement += line + '\n';
+        if (line.trim().endsWith(';') && (!trigger || /^\s*END;\s*$/i.test(line))) {
+          await db.prepare(statement.trim()).run(); statement = ''; trigger = false;
+        }
+      }
+      assert.equal(statement.trim(), '');
     }
     browser = await chromium.launch({headless: true, ...(process.env.CHROMIUM_PATH ? {executablePath: process.env.CHROMIUM_PATH} : {}), args: ['--no-sandbox']});
     const context = await browser.newContext();
+    await context.route('https://github.com/login/oauth/authorize**', async route => {
+      const authorization = new URL(route.request().url());
+      providerChallenge = authorization.searchParams.get('code_challenge')!;
+      await route.fulfill({status: 302, headers: {Location: origin + '/auth/github/callback?code=test-code&state=' + authorization.searchParams.get('state')}});
+    });
     const page = await context.newPage();
     const errors: string[] = [];
     page.on('pageerror', e => errors.push(e.message));
@@ -55,9 +78,9 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
     await page.getByLabel('New password', {exact: true}).fill(initial);
     await page.getByRole('button', {name: 'Save password'}).click();
     await expect(page.getByRole('heading', {name: 'Email verified'})).toBeVisible();
-    async function login(password: string) {
+    async function login(password: string, email = 'browser@example.com') {
       await page.goto(origin + '/login');
-      await page.getByLabel('Email', {exact: true}).fill('browser@example.com');
+      await page.getByLabel('Email', {exact: true}).fill(email);
       await page.getByLabel('Password', {exact: true}).fill(password);
       await page.getByRole('button', {name: 'Sign in', exact: true}).click();
     }
@@ -119,6 +142,46 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
     await page.getByRole('button', {name: 'Verify authenticator code'}).click();
     await expect(page).toHaveURL(origin + '/account');
     assert.equal((await db.prepare('SELECT count(*) AS n FROM totp_credentials').first())!.n, 1);
+    // The following independent settings flow starts with fresh rate-limit state.
+    await db.prepare('DELETE FROM auth_limits').run();
+    await page.getByRole('button', {name: 'Lock security settings'}).click();
+    await expect(page.getByRole('heading', {name: 'Unlock security settings'})).toBeVisible();
+    await page.getByRole('button', {name: 'Unlock with a passkey'}).click();
+    await expect(page).toHaveURL(origin + '/account');
+    await page.getByRole('button', {name: 'Connect GitHub', exact: true}).click();
+    await expect(page.getByRole('heading', {name: 'Confirm account connection'})).toBeVisible();
+    await page.getByRole('button', {name: 'Connect GitHub', exact: true}).click();
+    await expect(page).toHaveURL(origin + '/account');
+    await expect(page.getByText('GitHub: Linked GitHub', {exact: true})).toBeVisible();
+    await page.getByRole('button', {name: 'Disconnect GitHub', exact: true}).click();
+    await expect(page).toHaveURL(origin + '/account');
+    await expect(page.getByText('GitHub: Not connected', {exact: true})).toBeVisible();
+    await page.getByLabel('New email address', {exact: true}).fill('changed@example.com');
+    await page.getByRole('button', {name: 'Request email change'}).click();
+    await expect(page.getByRole('heading', {name: 'Confirm both email addresses'})).toBeVisible();
+    const approval = mail.findLast(m => m.subject === 'Approve your Blockworked email change');
+    const verificationMail = mail.findLast(m => m.subject === 'Verify your new Blockworked email');
+    for (const email of [approval, verificationMail]) {
+      const confirmation = await context.newPage();
+      const link = email.text_body.match(/http:\/\/localhost:[0-9]+\/account\/email-change\/approve\?token=[\w-]+/)[0];
+      await confirmation.goto(link);
+      await confirmation.getByRole('button', {name: 'Confirm this email address'}).click();
+      await expect(confirmation.getByRole('heading', {name: 'Email address confirmed'})).toBeVisible();
+      await confirmation.close();
+    }
+    await page.goto(origin + '/account');
+    await page.getByRole('button', {name: 'Finish email change'}).click();
+    await expect(page).toHaveURL(origin + '/account');
+    await expect(page.getByText('changed@example.com', {exact: true})).toBeVisible();
+    assert.equal((await db.prepare('SELECT count(*) AS n FROM passkeys').first())!.n, 1);
+    assert.equal((await db.prepare('SELECT count(*) AS n FROM totp_credentials').first())!.n, 1);
+    await page.getByRole('button', {name: 'Sign out', exact: true}).click();
+    await login(next);
+    await expect(page.getByRole('alert')).toHaveText('Email or password is incorrect.');
+    await login(next, 'changed@example.com');
+    await expect(page.getByRole('heading', {name: 'Verify your sign-in'})).toBeVisible();
+    await page.getByRole('button', {name: 'Use a passkey', exact: true}).click();
+    await expect(page).toHaveURL(origin + '/account');
     assert.deepEqual(errors, []);
   } finally {
     await browser?.close();
