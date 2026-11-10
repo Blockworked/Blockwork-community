@@ -24,9 +24,10 @@ async function complete(env: Env, flow: Flow, id: string, strength: string, next
   const res = await issueSession(env, id, user.auth_version, strength, next, unlockedAt);
   if (res.status !== 303) return fail();
   const headers = new Headers(res.headers);
+  const destination = headers.get('Location');
   headers.delete('Location');
   headers.set('Content-Type', 'application/json');
-  return new Response(JSON.stringify({next: safeNext(next, env)}), {headers});
+  return new Response(JSON.stringify({next: destination}), {headers});
 }
 export async function passkeyRoute(req: Request, env: Env, path: string, body: Record<string, unknown>): Promise<Response> {
   const {rpID, expectedOrigin} = rp(env);

@@ -67,7 +67,7 @@ export function siteFooter(place = LIBRARY): string {
 <nav class="footer-links" aria-label="Footer">
 <a href="${esc(mainUrl)}/download">Download</a><a href="${esc(mainUrl)}/changelog">Changelog</a><a href="${esc(place.community)}">Community blocks</a><a href="${esc(supportUrl)}/">Support</a>
 <a href="${REPO_URL}">Source</a><a href="${REPO_URL}/issues">Report an issue</a><a href="${REPO_URL}/releases">All releases</a>
-<a href="https://github.com/Blockworked/Blockwork-community-blocks">Library source</a>
+<a href="https://github.com/Blockworked/Blockwork-community">Library source</a>
 </nav><p class="copyright">© ${year} Blockworked</p></div></footer>`;
 }
 

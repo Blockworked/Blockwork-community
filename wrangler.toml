@@ -10,6 +10,8 @@ routes = [
 ]
 
 [vars]
+# Set a positive number to restore the username change delay.
+USERNAME_COOLDOWN_DAYS = "0"
 # Enable after following docs/accounts.md; this requires migrations 0012–0014 even when disabled.
 LOCAL_AUTH_ENABLED = "true"
 AUTH_FROM = "noreply@blockworked.com"

@@ -35,17 +35,18 @@ export interface VersionRow {
 export interface ListedPack extends VersionRow {
   owner_id: string;
   author_public_id: string;
+  author_username?: string | null;
   author_avatar: string;
   pack_created_at: number;
   comments: number;
 }
 
-const LISTED = `SELECT v.*, u.name AS author, u.public_id AS author_public_id, u.avatar AS author_avatar,
+const LISTED = `SELECT v.*, u.name AS author, u.public_id AS author_public_id, u.username AS author_username, u.avatar AS author_avatar,
        p.owner_id AS owner_id, p.created_at AS pack_created_at,
        (SELECT COUNT(*) FROM comments c JOIN users cu ON cu.id = c.user_id
-        WHERE c.pack_id = p.id AND c.deleted_at IS NULL AND cu.banned = 0) AS comments
+        WHERE c.pack_id = p.id AND c.deleted_at IS NULL AND cu.banned = 0 AND cu.deactivated_at = 0 AND cu.deleted_at = 0) AS comments
      FROM versions v JOIN packs p ON p.id = v.pack_id JOIN users u ON u.id = p.owner_id
-     WHERE p.listed = 1 AND u.banned = 0
+     WHERE p.listed = 1 AND u.banned = 0 AND u.deactivated_at = 0 AND u.deleted_at = 0
        AND v.id = (SELECT MAX(id) FROM versions WHERE pack_id = p.id AND status = 'approved')`;
 
 /** Each listed pack's newest approved version. */
@@ -179,7 +180,7 @@ export function listedCard(p: ListedPack): string {
   return `<article class="card pack">
     <div class="pack-head"><h3><a href="${href}">${esc(p.name)}</a> <span class="version">${esc(p.version)}</span></h3>
       ${p.comments ? `<a class="count" href="${href}#comments" title="${plural(p.comments, "comment")}">${COMMENT_ICON}${p.comments}</a>` : ""}</div>
-    <p class="muted by meta"><span>by ${authorLink(p.author, p.author_public_id, p.owner_id === OFFICIAL_OWNER)}</span><span>${plural(count, "block")}</span><span>updated ${date(p.submitted_at)}</span></p>
+    <p class="muted by meta"><span>by ${authorLink(p.author, p.author_username || p.author_public_id, p.owner_id === OFFICIAL_OWNER)}</span><span>${plural(count, "block")}</span><span>updated ${date(p.submitted_at)}</span></p>
     <p>${esc(p.description)}</p>${blockPictures(p)}${capabilityList(JSON.parse(p.capabilities))}</article>`;
 }
 
@@ -267,7 +268,7 @@ function packHeader(p: ListedPack, current: "overview" | "source", versionNote =
   return `<p class="crumbs"><a href="/">${BACK}All packs</a></p>
     <div class="pack-title"><h1>${esc(p.name)} <span class="version">${esc(p.version)}</span></h1>
       <p class="actions"><a class="button" href="/packs/${p.sha256}.json" download="${esc(p.pack_id)}.blockpack">Download</a></p></div>
-    <p class="muted by meta"><span>by ${authorLink(p.author, p.author_public_id, p.owner_id === OFFICIAL_OWNER)}</span><span>updated ${date(p.submitted_at)}</span><span>first shared ${date(p.pack_created_at)}</span>${versionNote}</p>
+    <p class="muted by meta"><span>by ${authorLink(p.author, p.author_username || p.author_public_id, p.owner_id === OFFICIAL_OWNER)}</span><span>updated ${date(p.submitted_at)}</span><span>first shared ${date(p.pack_created_at)}</span>${versionNote}</p>
     <nav class="tabs" aria-label="Pack">${tab("overview", base, "Overview")}${tab("source", `${base}/source`, "Source")}${tab("comments", `${base}#comments`, `Comments <span class="n">${p.comments}</span>`)}</nav>`;
 }
 
@@ -346,11 +347,13 @@ export async function sourcePage(env: Env, user: User | null, admin: boolean, id
   );
 }
 
-export async function authorPage(env: Env, user: User | null, admin: boolean, publicId: string): Promise<Response> {
-  const author = await env.DB.prepare("SELECT id, name, avatar, username, created_at FROM users WHERE public_id = ? AND banned = 0")
-    .bind(publicId)
-    .first<{ id: string; name: string; avatar: string; username: string | null; created_at: number }>();
+export async function authorPage(env: Env, user: User | null, admin: boolean, slug: string, usernameOnly = false): Promise<Response> {
+  const author = await env.DB.prepare(`SELECT id, name, avatar, username, public_id, created_at FROM users WHERE ${usernameOnly ? "username = ? COLLATE NOCASE" : "(username = ? COLLATE NOCASE OR public_id = ?)"} AND banned = 0 AND deactivated_at = 0 AND deleted_at = 0 ORDER BY CASE WHEN public_id = ? COLLATE NOCASE THEN 0 ELSE 1 END LIMIT 1`)
+    .bind(...(usernameOnly ? [slug,slug] : [slug,slug,slug]))
+    .first<{ id: string; name: string; avatar: string; username: string | null; public_id: string; created_at: number }>();
   if (!author) return message(user, admin, "Not found", "There's no one here by that name.", 404);
+  const canonical = `/authors/${author.username || author.public_id}`;
+  if (usernameOnly || slug !== (author.username || author.public_id)) return new Response(null, {status:302,headers:{Location:canonical,'Cache-Control':'no-store'}});
   const { results } = await env.DB.prepare(`${LISTED} AND p.owner_id = ? ORDER BY v.submitted_at DESC`).bind(author.id).all<ListedPack>();
   const official = author.id === OFFICIAL_OWNER;
   const avatar = author.avatar ? `<img class="avatar large" src="${esc(author.avatar)}" alt="">` : "";

@@ -227,11 +227,14 @@ never overwrite profile edits.
 Usernames are optional public handles, separate from email sign-in. They use
 3–30 ASCII letters, digits or underscores, begin with a letter, and normalize
 to lowercase. A unique database index arbitrates concurrent claims. Team and
-staff names are reserved. A successful first claim or change starts a 30-day
-cooldown stored on the user; failed attempts do not start it. Released handles
+staff names are reserved. Username changes have no delay by default. Set `USERNAME_COOLDOWN_DAYS` to a
+positive number to restore a configurable cooldown, using the stored last-change
+time. Failed attempts do not start a cooldown. Released handles
 remain reserved to the same owner for 90 days to limit impersonation. Handles
-appear on public author pages and in the app profile API; `/@username` resolves
-the current owner while existing stable author URLs and account IDs remain valid.
+appear on public author pages and in the app profile API; `/authors/username` is the canonical profile URL. Stable ID URLs and `/@username`
+redirect to it without caching redirects across future username changes. Author
+links in packs, comments and the app API use the username when present. Claims
+that collide with another account’s stable public ID are refused.
 Existing users select their own handle rather than inheriting provider names.
 
 Profile edits are limited to 20 requests per account per hour, pictures to 10.
@@ -241,3 +244,32 @@ and a bounded decompressed raster; it rejects animation and strips metadata.
 Only the current picture is stored in D1. Replacement/removal invalidates its
 previous URL and image responses use no-store. Migration `0015_profiles.sql`
 is additive and leaves credentials, ownership and sessions intact.
+
+## Support email and account lifecycle
+
+New signed-in support tickets automatically use the verified account email and
+do not ask for another address. The server ignores a posted replacement address.
+Accounts without an attached email can optionally provide one or leave it blank;
+receipts and reply emails are skipped when blank, and answers remain in My tickets.
+
+Security settings link to a separate deactivation/deletion confirmation page.
+Both actions require a valid settings unlock, enrolled MFA when present, an
+exact-Origin POST and explicit confirmation. Recovery-code sessions must first
+sign in using a full credential/MFA method before taking these actions.
+
+Deactivation atomically hides public profiles, packs, comments, downloads and
+avatars, increments the credential generation and revokes sessions, app codes and
+pending account proofs. Credentials and usernames are preserved. Normal sign-in
+must still complete enrolled MFA before it issues a short-lived browser-bound
+reactivation intent. An explicit reactivation POST consumes the intent, advances
+the credential generation and issues a fresh session. It cannot bypass bans.
+
+Deletion removes email/password credentials, OAuth identities, passkeys, TOTP,
+backup codes, profile pictures and personal profile fields. It removes comment
+text, unlists packs, redacts owned support ticket contents and contact details,
+rotates ticket access keys and queues attachment removal from R2. Failed R2
+cleanup retries hourly. An internal tombstone preserves ownership and audit
+references; deletion cannot restore sign-in or reassign old packs via OAuth.
+Published pack files and existing downloads/backups are not recalled. Minimal
+ownership/security audit records remain, as the confirmation page explains.
+Migration `0016_account_lifecycle.sql` adds lifecycle flags and the cleanup queue.

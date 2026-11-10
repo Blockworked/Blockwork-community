@@ -145,7 +145,7 @@ export async function saveRenders(req: Request, env: Env, versionId: number): Pr
 export async function renderFile(env: Env, admin: boolean, sha: string, id: string, theme: string, format: "png" | "webp" = "png"): Promise<Response> {
   if (!admin) {
     const ok = await env.DB.prepare(
-      `SELECT 1 FROM versions v JOIN packs p ON p.id = v.pack_id WHERE v.sha256 = ? AND v.status = 'approved' AND p.listed = 1`,
+      `SELECT 1 FROM versions v JOIN packs p ON p.id = v.pack_id JOIN users u ON u.id = p.owner_id WHERE v.sha256 = ? AND v.status = 'approved' AND p.listed = 1 AND u.deactivated_at = 0 AND u.deleted_at = 0`,
     )
       .bind(sha)
       .first();

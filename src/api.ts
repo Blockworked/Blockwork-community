@@ -27,7 +27,7 @@ export async function bearerUser(req: Request, env: Env): Promise<User | null> {
   const m = (req.headers.get("Authorization") ?? "").match(/^Bearer ([A-Za-z0-9_-]{20,100})$/);
   if (!m) return null;
   const user = await env.DB.prepare(
-    "SELECT u.id, u.name, u.avatar, u.banned FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ? AND s.kind = 'app'",
+    "SELECT u.id, u.name, u.avatar, u.banned FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ? AND s.kind = 'app' AND u.deactivated_at = 0 AND u.deleted_at = 0",
   )
     .bind(await hash(m[1]), Date.now())
     .first<User>();
@@ -95,7 +95,7 @@ export async function appLoginConfirm(req: Request, env: Env, user: User | null)
   const code = randomToken();
   const sessionHashes = await Promise.all(cookies(req, "session").slice(0, 2).map(hash));
   const result = await env.DB.prepare(`INSERT INTO app_codes (code_hash, user_id, challenge, label, expires_at, auth_version)
-    SELECT ?, u.id, ?, ?, ?, u.auth_version FROM users u WHERE u.id = ? AND u.banned = 0
+    SELECT ?, u.id, ?, ?, ?, u.auth_version FROM users u WHERE u.id = ? AND u.banned = 0 AND u.deactivated_at = 0 AND u.deleted_at = 0
     AND EXISTS (SELECT 1 FROM sessions s WHERE s.user_id = u.id AND s.kind = 'web' AND s.expires_at > ? AND s.token_hash IN (?, ?))`)
     .bind(await hash(code), ask.challenge, ask.label, Date.now() + CODE_MINUTES * 60_000, user.id, Date.now(), sessionHashes[0] ?? "", sessionHashes[1] ?? "").run();
   if (result.meta.changes !== 1) return new Response(null, {status: 303, headers: {Location: "/login"}});
@@ -124,7 +124,7 @@ async function profile(env: Env, user: User) {
     username: row?.username ?? null,
     avatar: user.avatar,
     id: row?.public_id ?? "",
-    page: row?.public_id ? `${env.SITE_URL}/authors/${row.public_id}` : "",
+    page: row?.public_id ? `${env.SITE_URL}/authors/${row.username || row.public_id}` : "",
     official: user.id === OFFICIAL_OWNER,
     banned: !!user.banned,
   };
@@ -147,7 +147,7 @@ async function token(req: Request, env: Env): Promise<Response> {
   const secret = randomToken();
   const now = Date.now();
   const result = await env.DB.prepare(`INSERT INTO sessions (token_hash, user_id, expires_at, kind, label, created_at)
-    SELECT ?, id, ?, 'app', ?, ? FROM users WHERE id = ? AND auth_version = ? AND banned = 0`)
+    SELECT ?, id, ?, 'app', ?, ? FROM users WHERE id = ? AND auth_version = ? AND banned = 0 AND deactivated_at = 0 AND deleted_at = 0`)
     .bind(await hash(secret), now + APP_SESSION_DAYS * 86400_000, row.label, now, user.id, row.auth_version).run();
   if (result.meta.changes !== 1) return fail("That sign-in didn't work. Try again.");
   return json({ token: secret, user: await profile(env, user) });
@@ -221,7 +221,7 @@ function commentJson(c: Awaited<ReturnType<typeof listComments>>[number], user: 
     id: c.id,
     author: c.name,
     avatar: c.avatar,
-    author_page: c.public_id ? `/authors/${c.public_id}` : "",
+    author_page: (c.username || c.public_id) ? `/authors/${c.username || c.public_id}` : "",
     official: c.user_id === OFFICIAL_OWNER,
     pack_author: c.user_id === ownerId,
     mine: !!user && user.id === c.user_id,
@@ -248,7 +248,7 @@ async function packDetail(env: Env, user: User | null, admin: boolean, id: strin
     version: p.version,
     sha256: p.sha256,
     author: p.author,
-    author_page: p.author_public_id ? `/authors/${p.author_public_id}` : "",
+    author_page: (p.author_username || p.author_public_id) ? `/authors/${p.author_username || p.author_public_id}` : "",
     official: p.owner_id === OFFICIAL_OWNER,
     mine: !!user && user.id === p.owner_id,
     page: `/packs/${encodeURIComponent(p.pack_id)}`,

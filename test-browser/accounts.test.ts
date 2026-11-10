@@ -39,7 +39,7 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
   try {
     const ready = await mf.ready;
     origin = `http://localhost:${ready.port}`;
-    await mf.setOptions(convertV4MiniflareOptions({...options, port: Number(ready.port), bindings: {...options.bindings, SITE_URL: origin}}));
+    await mf.setOptions(convertV4MiniflareOptions({...options, port: Number(ready.port), bindings: {...options.bindings, SITE_URL: origin, SUPPORT_URL: origin + '/support'}}));
     const db = await mf.getD1Database('DB');
     for (const file of readdirSync('migrations').filter(f => f.endsWith('.sql')).sort()) {
       const lines = readFileSync(join('migrations', file), 'utf8').replace(/--[^\n]*/g, '').split('\n');
@@ -191,10 +191,11 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
     await page.getByLabel('Username',{exact:true}).fill('Browser_User');
     await page.getByRole('button',{name:'Save username'}).click();
     await expect(page.getByLabel('Username',{exact:true})).toHaveValue('browser_user');
-    await expect(page.getByRole('button',{name:'Save username'})).toBeDisabled();
+    await expect(page.getByRole('button',{name:'Save username'})).toBeEnabled();
     await page.getByRole('link',{name:/View public profile/}).click();
     await expect(page.getByRole('heading',{name:'Updated Browser User',exact:true})).toBeVisible();
     await expect(page.getByText('@browser_user',{exact:true})).toBeVisible();
+    await expect(page).toHaveURL(origin + '/authors/browser_user');
     await page.goto(origin + '/account/profile');
     const inputPicture = await page.evaluate(() => {
       const canvas = document.createElement('canvas'); canvas.width=300; canvas.height=200;
@@ -226,6 +227,35 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
     await page.getByRole('button',{name:'Lock security settings'}).click();
     await page.getByRole('navigation',{name:'Account settings'}).getByRole('link',{name:'Profile',exact:true}).click();
     await expect(page.getByLabel('Display name',{exact:true})).toHaveValue('Updated Browser User');
+    await page.goto(origin + '/support/new');
+    await expect(page.locator('input[name=email]')).toHaveCount(0);
+    await expect(page.getByText('Replies go to your account email: changed@example.com.')).toBeVisible();
+    await page.getByLabel('Subject',{exact:true}).fill('Browser ticket');
+    await page.getByLabel("What's going on?",{exact:true}).fill('Testing the account ticket flow.');
+    await page.getByRole('button',{name:'Send',exact:true}).click();
+    await expect(page.getByRole('heading',{name:/Browser ticket/})).toBeVisible();
+    await page.goto(origin + '/account/security');
+    await page.getByRole('button',{name:'Unlock with a passkey'}).click();
+    await page.getByRole('link',{name:'Deactivate or delete account'}).click();
+    await page.getByLabel('Deactivate my account',{exact:true}).check();
+    await page.getByRole('button',{name:'Confirm deactivation'}).click();
+    await expect(page).toHaveURL(origin + '/login');
+    assert.equal((await context.request.get(origin + '/authors/browser_user')).status(),404);
+    await page.getByRole('button',{name:'Sign in with a passkey'}).click();
+    await expect(page.getByRole('heading',{name:'Reactivate account',exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Reactivate my account'}).click();
+    await expect(page).toHaveURL(origin + '/account/profile');
+    assert.equal((await context.request.get(origin + '/authors/browser_user')).status(),200);
+    await page.getByRole('navigation',{name:'Account settings'}).getByRole('link',{name:'Security',exact:true}).click();
+    await page.getByRole('button',{name:'Unlock with a passkey'}).click();
+    await page.getByRole('link',{name:'Deactivate or delete account'}).click();
+    await page.getByLabel('Type DELETE to confirm').fill('DELETE');
+    await page.getByRole('button',{name:'Delete my account permanently'}).click();
+    await expect(page).toHaveURL(origin + '/login');
+    assert.equal((await context.request.get(origin + '/authors/browser_user')).status(),404);
+    assert.equal((await db.prepare('SELECT count(*) n FROM email_credentials').first())!.n,0);
+    assert.equal((await db.prepare('SELECT count(*) n FROM passkeys').first())!.n,0);
+    assert.equal((await db.prepare('SELECT count(*) n FROM totp_credentials').first())!.n,0);
     assert.deepEqual(errors, []);
   } finally {
     await browser?.close();

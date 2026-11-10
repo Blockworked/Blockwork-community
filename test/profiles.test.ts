@@ -4,7 +4,7 @@ import { deflateSync } from 'node:zlib';
 import { fixture, cookieOf } from './helpers/accounts.ts';
 import { issueSession } from '../src/account-security.ts';
 import { cleanProfilePng } from '../src/profile-image.ts';
-import { profilePicture, USERNAME_COOLDOWN } from '../src/profile.ts';
+import { profilePicture, usernameCooldown } from '../src/profile.ts';
 
 function png(width = 2, height = 2, metadata = false, raster?: Buffer) {
   const chunk = (type: string, bytes: Buffer) => {
@@ -37,13 +37,14 @@ test('profile and sidebar work while security is locked; only one settings entry
 
 test('usernames normalize case, are unique, and enforce a persisted thirty-day cooldown', async () => {
   const f=fixture(), a=await owner(f), b=await owner(f,'local:other');
+  f.env.USERNAME_COOLDOWN_DAYS = '30';
   assert.equal((await f.request('/account/profile',{action:'username',username:'Alice_12'},a)).status,303);
   assert.equal(f.sql.prepare("SELECT username FROM users WHERE id='local:profile'").get()!.username,'alice_12');
   assert.equal((await f.request('/account/profile',{action:'username',username:'ALICE_12'},b)).status,409);
   assert.equal((await f.request('/account/profile',{action:'username',username:'alice_12'},a)).status,303);
   const cooldown=await f.request('/account/profile',{action:'username',username:'new_name'},a);
   assert.equal(cooldown.status,429); assert.ok(Number(cooldown.headers.get('Retry-After')) > 29*86400);
-  f.sql.prepare('UPDATE users SET username_changed_at = ? WHERE id = ?').run(Date.now()-USERNAME_COOLDOWN-1000,'local:profile');
+  f.sql.prepare('UPDATE users SET username_changed_at = ? WHERE id = ?').run(Date.now()-usernameCooldown(f.env)-1000,'local:profile');
   assert.equal((await f.request('/account/profile',{action:'username',username:'new_name'},a)).status,303);
   assert.equal((await f.request('/account/profile',{action:'username',username:'alice_12'},b)).status,409);
   f.sql.prepare('UPDATE username_history SET hold_until=0').run();
