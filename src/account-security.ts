@@ -71,6 +71,13 @@ export function redirect(path: string, flow?: string): Response {
   return new Response(null, { status: 303, headers });
 }
 export async function issueSession(env: Env, id: string, authVersion: number, strength: string, next = '/account/security', unlockedAt?: number): Promise<Response> {
+  const state = await env.DB.prepare('SELECT deactivated_at FROM users WHERE id = ? AND auth_version = ? AND banned = 0 AND deleted_at = 0').bind(id,authVersion).first<{deactivated_at:number}>();
+  if (state?.deactivated_at) {
+    const intent = await makeFlow(env,'reactivate',id,{strength},600,authVersion);
+    const response = redirect('/account/reactivate');
+    response.headers.append('Set-Cookie',flowCookie(intent,600,'__Host-reactivation'));
+    return response;
+  }
   const token = randomToken();
   const now = Date.now();
   const target = new URL(safeNext(next, env), env.SITE_URL);
@@ -82,7 +89,7 @@ export async function issueSession(env: Env, id: string, authVersion: number, st
     unlock = 0;
   }
   const result = await env.DB.prepare(`INSERT INTO sessions (token_hash, user_id, expires_at, created_at, auth_strength, security_unlocked_at, security_last_used_at)
-    SELECT ?, id, ?, ?, ?, ?, ? FROM users WHERE id = ? AND auth_version = ? AND banned = 0`)
+    SELECT ?, id, ?, ?, ?, ?, ? FROM users WHERE id = ? AND auth_version = ? AND banned = 0 AND deactivated_at = 0 AND deleted_at = 0`)
     .bind(await hash(token), now + 30 * 86400_000, now, strength, unlock, unlock ? now : 0, id, authVersion).run();
   if (result.meta.changes !== 1) return new Response('Sign-in expired. Try again.', { status: 401 });
   const headers = new Headers({ Location: safeNext(next, env), 'Cache-Control': 'no-store' });
@@ -108,7 +115,7 @@ export async function securitySession(req: Request, env: Env, user: User, requir
   for (const token of cookies(req, 'session').slice(0, 2)) {
     const row = await env.DB.prepare(`UPDATE sessions SET security_last_used_at = ? WHERE token_hash = ? AND user_id = ? AND kind = 'web'
       AND expires_at > ? AND security_unlocked_at > ? AND security_last_used_at > ?
-      AND EXISTS (SELECT 1 FROM users WHERE id = sessions.user_id AND banned = 0)
+      AND EXISTS (SELECT 1 FROM users WHERE id = sessions.user_id AND banned = 0 AND deactivated_at = 0 AND deleted_at = 0)
       AND (auth_strength IN ('strong','totp') OR (? = 0 AND (auth_strength = 'recovery' OR
         (auth_strength = 'primary' AND NOT EXISTS (SELECT 1 FROM passkeys WHERE user_id = sessions.user_id)
         AND NOT EXISTS (SELECT 1 FROM totp_credentials WHERE user_id = sessions.user_id)))))

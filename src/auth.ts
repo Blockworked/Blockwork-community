@@ -72,7 +72,7 @@ export function isReservedName(name: string): boolean {
 export async function currentUser(req: Request, env: Env): Promise<User | null> {
   for (const token of cookies(req, "session").slice(0, 2)) {
     const user = await env.DB.prepare(
-      "SELECT u.id, u.name, u.avatar, u.banned FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ? AND s.kind = 'web'",
+      "SELECT u.id, u.name, u.avatar, u.banned FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ? AND s.kind = 'web' AND u.deactivated_at = 0 AND u.deleted_at = 0",
     )
       .bind(await hash(token), Date.now())
       .first<User>();

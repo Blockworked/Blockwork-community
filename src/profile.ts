@@ -5,7 +5,10 @@ import { settingsPage } from './account-views.ts';
 import { cleanProfilePng } from './profile-image.ts';
 import { esc } from './pages.ts';
 
-export const USERNAME_COOLDOWN = 30 * 86400_000;
+export function usernameCooldown(env: Env): number {
+  const days = Number(env.USERNAME_COOLDOWN_DAYS ?? '0');
+  return Number.isFinite(days) && days >= 0 ? days * 86400_000 : 0;
+}
 const RESERVED = new Set(['admin','admins','administrator','support','security','moderator','moderators','staff','team','system','root','noreply','no_reply','official','help','api','account','settings','deleted','anonymous']);
 export function usernameError(username: string, team = false): string | null {
   if (!/^[a-z][a-z0-9_]{2,29}$/.test(username)) return 'Use 3–30 letters, numbers or underscores, starting with a letter.';
@@ -25,7 +28,7 @@ export async function profileRoute(req: Request, env: Env, user: User | null): P
   let body: Record<string, unknown>;
   try { body = await boundedBody(req, path.endsWith('/picture') ? 360000 : 2000); }
   catch { return fail('The upload is too large or invalid.', 413); }
-  const now = Date.now();
+  const now = Date.now(), cooldown = usernameCooldown(env);
   const hashes = await Promise.all(cookies(req, 'session').slice(0,2).map(hash));
   // Recheck the browser session at the write, including after image processing.
   const guard = `id = ? AND banned = 0 AND EXISTS (SELECT 1 FROM sessions WHERE user_id = users.id AND kind = 'web' AND expires_at > ? AND token_hash IN (?,?))`;
@@ -64,15 +67,16 @@ export async function profileRoute(req: Request, env: Env, user: User | null): P
     if (problem) return fail(problem);
     const current = await env.DB.prepare('SELECT username,username_changed_at FROM users WHERE id = ?').bind(user.id).first<{username:string|null; username_changed_at:number}>();
     if (current?.username === username) return redirect('/account/profile?saved=1');
-    if (current && current.username_changed_at > now - USERNAME_COOLDOWN) {
-      const response = await fail('You can change your username once every 30 days.',429);
-      response.headers.set('Retry-After',String(Math.ceil((current.username_changed_at + USERNAME_COOLDOWN - now)/1000))); return response;
+    if (cooldown > 0 && current && current.username_changed_at > now - cooldown) {
+      const response = await fail(`You can change your username once every ${cooldown / 86400_000} days.`,429);
+      response.headers.set('Retry-After',String(Math.ceil((current.username_changed_at + cooldown - now)/1000))); return response;
     }
     let changed = false;
     try {
       const result = await env.DB.prepare(`UPDATE users SET username = ?, username_changed_at = ? WHERE ${guard}
-        AND username_changed_at <= ? AND NOT EXISTS (SELECT 1 FROM username_history WHERE username = ? AND user_id != ? AND hold_until > ?)`)
-        .bind(username,now,...guardValues(),now - USERNAME_COOLDOWN,username,user.id,now).run();
+        AND NOT EXISTS (SELECT 1 FROM users occupied WHERE occupied.public_id = ? AND occupied.id != users.id)
+        AND (? = 0 OR username_changed_at <= ?) AND NOT EXISTS (SELECT 1 FROM username_history WHERE username = ? AND user_id != ? AND hold_until > ?)`)
+        .bind(username,now,...guardValues(),username,cooldown,now - cooldown,username,user.id,now).run();
       changed = result.meta.changes === 1;
     } catch (e) {
       if (!String(e).includes('UNIQUE constraint')) throw e;
@@ -83,17 +87,18 @@ export async function profileRoute(req: Request, env: Env, user: User | null): P
 }
 async function profilePage(env: Env, user: User, error = '', status = 200): Promise<Response> {
   const profile = await env.DB.prepare('SELECT username,username_changed_at FROM users WHERE id = ?').bind(user.id).first<{username:string|null;username_changed_at:number}>();
-  const available = profile && profile.username_changed_at > Date.now() - USERNAME_COOLDOWN ? new Date(profile.username_changed_at + USERNAME_COOLDOWN).toISOString().slice(0,10) : '';
+  const cooldown = usernameCooldown(env);
+  const available = cooldown > 0 && profile && profile.username_changed_at > Date.now() - cooldown ? new Date(profile.username_changed_at + cooldown).toISOString().slice(0,10) : '';
   return settingsPage(user,env,'Profile',`${error ? `<p role="alert">${esc(error)}</p>` : ''}
     <section class="card"><h3>Display name</h3><form method="post" action="/account/profile"><input type="hidden" name="action" value="name"><p><label>Display name<br><input name="name" type="text" autocomplete="nickname" maxlength="80" required value="${esc(user.name)}"></label></p><button>Save display name</button></form></section>
-    <section class="card"><h3>Username</h3><form method="post" action="/account/profile"><input type="hidden" name="action" value="username"><p><label>Username<br><input name="username" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" minlength="3" maxlength="30" pattern="[A-Za-z][A-Za-z0-9_]{2,29}" required value="${esc(profile?.username ?? '')}"></label></p><p class="muted">3–30 letters, numbers or underscores. Starts with a letter. Changes are limited to once every 30 days.${available ? ` Next change: ${esc(available)}.` : ''}</p><button ${available ? 'disabled' : ''}>Save username</button></form>${profile?.username ? `<p><a href="/@${esc(profile.username)}">View public profile · @${esc(profile.username)}</a></p>` : ''}</section>
+    <section class="card"><h3>Username</h3><form method="post" action="/account/profile"><input type="hidden" name="action" value="username"><p><label>Username<br><input name="username" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" minlength="3" maxlength="30" pattern="[A-Za-z][A-Za-z0-9_]{2,29}" required value="${esc(profile?.username ?? '')}"></label></p><p class="muted">3–30 letters, numbers or underscores. Starts with a letter. ${cooldown ? `Changes are limited to once every ${cooldown / 86400_000} days.` : 'You can change your username at any time.'}${available ? ` Next change: ${esc(available)}.` : ''}</p><button ${available ? 'disabled' : ''}>Save username</button></form>${profile?.username ? `<p><a href="/authors/${esc(profile.username)}">View public profile · @${esc(profile.username)}</a></p>` : ''}</section>
     <section class="card"><h3>Profile picture</h3>${user.avatar ? `<p><img class="profile-picture" src="${esc(user.avatar)}" alt="Current profile picture"></p>` : ''}
     <form id="profile-picture-form"><p><label>Profile picture<br><input name="picture" type="file" accept="image/png,image/jpeg,image/webp" required></label></p><button>Upload picture</button></form><p class="muted">PNG, JPEG or WebP, up to 5 MiB. Pictures are cropped to a square.</p>
     ${user.avatar ? '<form method="post" action="/account/profile"><input type="hidden" name="action" value="picture-remove"><button>Remove picture</button></form>' : ''}</section>
     <p id="auth-status" role="status"></p><script src="/account.js" defer></script>`,status);
 }
 export async function profilePicture(env: Env, id: string): Promise<Response> {
-  const row = await env.DB.prepare('SELECT p.png FROM profile_pictures p JOIN users u ON u.id = p.user_id WHERE p.id = ? AND u.banned = 0').bind(id).first<{png:string}>();
+  const row = await env.DB.prepare('SELECT p.png FROM profile_pictures p JOIN users u ON u.id = p.user_id WHERE p.id = ? AND u.banned = 0 AND u.deactivated_at = 0 AND u.deleted_at = 0').bind(id).first<{png:string}>();
   if (!row) return new Response('Not found',{status:404});
   const bytes = Uint8Array.from(atob(row.png),c => c.charCodeAt(0));
   return new Response(bytes,{headers:{'Content-Type':'image/png','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Disposition':'inline; filename="avatar.png"'}});

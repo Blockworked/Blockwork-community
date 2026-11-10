@@ -98,7 +98,7 @@ export async function setListed(req: Request, env: Env, packId: string): Promise
 
 export async function setBanned(req: Request, env: Env, userId: string): Promise<Response> {
   const ban = (await req.formData()).get("action") === "ban";
-  const statements = [env.DB.prepare("UPDATE users SET banned = ? WHERE id = ?").bind(ban ? 1 : 0, userId)];
+  const statements = [env.DB.prepare("UPDATE users SET banned = ? WHERE id = ? AND deleted_at = 0").bind(ban ? 1 : 0, userId)];
   if (ban) {
     statements.push(
       env.DB.prepare("UPDATE versions SET status = 'rejected', reason = 'Account banned', reviewed_at = ? WHERE submitted_by = ? AND status = 'pending'").bind(

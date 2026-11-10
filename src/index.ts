@@ -1,6 +1,7 @@
 // The Blockwork community block library: serves index.json and the pack files
 // Blockwork downloads, and takes reviewed submissions from signed-in accounts.
 
+import { cleanupAccountObjects } from './account-lifecycle.ts';
 import { profilePicture } from './profile.ts';
 import { AuthBusyError } from "./account-security.ts";
 import { localAuth } from "./local-auth.ts";
@@ -24,6 +25,7 @@ export interface Env {
   /** Enable only after migration, verified mail sender and adequate Workers CPU are configured. */
   LOCAL_AUTH_ENABLED?: string;
   AUTH_FROM?: string;
+  USERNAME_COOLDOWN_DAYS?: string;
   /** 32 random bytes encoded as unpadded base64url. A Worker secret, never a variable. */
   AUTH_TOTP_KEY?: string;
   PACKS: R2Bucket;
@@ -76,6 +78,7 @@ export default {
   },
 
   async scheduled(_event: ScheduledEvent, env: Env): Promise<void> {
+    await cleanupAccountObjects(env);
     await env.DB.batch([
       env.DB.prepare("DELETE FROM auth_flows WHERE expires_at <= ?").bind(Date.now()),
       env.DB.prepare("DELETE FROM auth_limits WHERE expires_at <= ?").bind(Date.now()),
@@ -173,11 +176,8 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
       });
     }
   }
-  if (method === 'GET' && (m = path.match(/^\/@([A-Za-z][A-Za-z0-9_]{2,29})$/))) {
-    const author = await env.DB.prepare('SELECT public_id FROM users WHERE username = ? COLLATE NOCASE AND banned = 0').bind(m[1]).first<{public_id:string}>();
-    return author ? authorPage(env,user,admin,author.public_id) : message(user,admin,'Not found', 'There is no profile with that username.',404);
-  }
-  if (method === "GET" && (m = path.match(/^\/authors\/([a-z0-9]{1,32})$/))) return authorPage(env, user, admin, m[1]);
+  if (method === 'GET' && (m = path.match(/^\/@([A-Za-z][A-Za-z0-9_]{2,29})$/))) return authorPage(env,user,admin,m[1],true);
+  if (method === 'GET' && (m = path.match(/^\/authors\/([A-Za-z0-9_]{1,32})$/))) return authorPage(env,user,admin,m[1]);
   if (method === "POST" && (m = path.match(/^\/comments\/(\d+)\/delete$/))) {
     if (!user) return message(user, admin, "Not found", "That comment doesn't exist.", 404);
     return deleteComment(env, user, admin, Number(m[1]));
@@ -242,8 +242,8 @@ async function indexJson(env: Env): Promise<Response> {
 
 async function packFile(env: Env, sha: string): Promise<Response> {
   const ok = await env.DB.prepare(
-    `SELECT 1 FROM versions v JOIN packs p ON p.id = v.pack_id
-     WHERE v.sha256 = ? AND v.status = 'approved' AND p.listed = 1`,
+    `SELECT 1 FROM versions v JOIN packs p ON p.id = v.pack_id JOIN users u ON u.id = p.owner_id
+     WHERE u.deactivated_at = 0 AND u.deleted_at = 0 AND v.sha256 = ? AND v.status = 'approved' AND p.listed = 1`,
   )
     .bind(sha)
     .first();

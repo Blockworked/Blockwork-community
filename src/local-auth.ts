@@ -12,6 +12,7 @@ import { passkeyRoute } from './passkeys.ts';
 import { securityUnlock } from './security-unlock.ts';
 import { emailChange } from './email-change.ts';
 import { oauthSettings } from './oauth.ts';
+import { lifecycleRoute } from './account-lifecycle.ts';
 import { profileRoute } from './profile.ts';
 import { ACCOUNT_JS } from './account-ui.ts';
 
@@ -67,6 +68,7 @@ async function settings(req: Request, env: Env, user: User): Promise<Response> {
       const label = event.action === 'email_changed' ? 'Linked email changed' : event.action === 'oauth_connected' ? 'Sign-in connected' : 'Sign-in disconnected';
       return `<li>${esc(label)}${event.detail ? `: ${esc(PROVIDERS[event.detail as keyof typeof PROVIDERS] || event.detail)}` : ''} · ${esc(new Date(event.created_at).toISOString())}</li>`;
     }).join('') || '<li>No recent changes.</li>'}</ul></section>
+    <section class="card"><h2>Account status</h2><a class="button" href="/account/lifecycle">Deactivate or delete account</a></section>
     <p id="auth-status" role="status"></p><script src="/account.js" defer></script>`);
 }
 
@@ -81,6 +83,7 @@ export async function localAuth(req: Request, env: Env, ctx?: Pick<ExecutionCont
   if (req.method !== 'GET' && req.method !== 'POST') return new Response('Method not allowed', {status: 405, headers: {Allow: 'GET, POST'}});
   if (req.method === 'POST' && req.headers.get('Origin') !== new URL(env.SITE_URL).origin) return error(env, 'Cross-site request refused.', 403);
   const user = await currentUser(req, env);
+  if (path === '/account/reactivate' || path.startsWith('/account/lifecycle')) return lifecycleRoute(req,env,user,ctx);
   if (path === '/account' || path === '/account/profile' || path === '/account/profile/picture') return profileRoute(req, env, user);
   if (path.startsWith('/staff/accounts')) return staffAccounts(req, env, user, ctx);
   if (path.startsWith('/account/unlock') || path === '/account/lock') return securityUnlock(req, env, user);

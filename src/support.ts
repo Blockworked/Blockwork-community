@@ -31,6 +31,7 @@ export interface Ticket {
   subject: string;
   status: Status;
   email: string;
+  account_deleted?: number;
   name: string;
   user_id: string | null;
   access_key: string;
@@ -201,7 +202,8 @@ function ticketRow(env: Env, t: Ticket, staff: boolean): string {
     ${staff ? `<span class="who-from">${esc(t.name || t.email)}</span>` : ""}${statusMark(t.status, staff)}<span class="time">${esc(when(t.updated_at))}</span></a></li>`;
 }
 
-function newForm(env: Env, user: User, staff: boolean, error = "", draft: { subject?: string; body?: string; email?: string } = {}, savedEmail = ""): Response {
+async function newForm(env: Env, user: User, staff: boolean, error = "", draft: { subject?: string; body?: string; email?: string } = {}, savedEmail = ""): Promise<Response> {
+  const attached = await env.DB.prepare("SELECT email FROM email_credentials WHERE user_id = ?").bind(user.id).first<{email:string}>();
   return page(
     "New ticket",
     user,
@@ -209,9 +211,9 @@ function newForm(env: Env, user: User, staff: boolean, error = "", draft: { subj
     `<h1>New ticket</h1>
      <form class="support-form comment-form" enctype="multipart/form-data" method="post" action="${link(env, "/new")}">
        ${error ? `<p class="risky">${esc(error)}</p>` : ""}
-       <label class="field" for="email">Your email</label>
-       <input type="email" id="email" name="email" required maxlength="254" autocomplete="email" value="${esc(draft.email ?? savedEmail)}">
-       <p class="muted" style="font-size:13px;margin:6px 0 0">We email you when we answer. Only staff see it.</p>
+       ${attached ? `<p class="muted">Replies go to your account email: ${esc(attached.email)}.</p>` : `<label class="field" for="email">Email (optional)</label>
+       <input type="email" id="email" name="email" maxlength="254" autocomplete="email" value="${esc(draft.email ?? savedEmail)}">
+       <p class="muted">Leave blank to read replies in My tickets.</p>`}
        <label class="field" for="subject">Subject</label>
        <input type="text" id="subject" name="subject" required maxlength="${MAX_SUBJECT}" value="${esc(draft.subject ?? "")}">
        <label class="field" for="body">What's going on?</label>
@@ -231,12 +233,13 @@ async function savedEmail(env: Env, user: User): Promise<string> {
 
 async function createFromForm(req: Request, env: Env, user: User, staff: boolean): Promise<Response> {
   const form = await req.formData();
-  const email = normalizeEmail(String(form.get("email") ?? ""));
+  const attached = await env.DB.prepare("SELECT email FROM email_credentials WHERE user_id = ?").bind(user.id).first<{email:string}>();
+  const email = attached?.email ?? normalizeEmail(String(form.get("email") ?? ""));
   const subject = String(form.get("subject") ?? "").replace(/\s+/g, " ").trim();
   const body = tidy(String(form.get("body") ?? ""));
   const draft = { email, subject, body };
   if (user.banned) return newForm(env, user, staff, "This account can't file tickets.", draft);
-  if (!isEmail(email)) return newForm(env, user, staff, "That email address doesn't look right.", draft);
+  if (email && !isEmail(email)) return newForm(env, user, staff, "That email address doesn't look right.", draft);
   if (!subject) return newForm(env, user, staff, "Give it a subject.", draft);
   if (subject.length > MAX_SUBJECT) return newForm(env, user, staff, `Subjects can be up to ${MAX_SUBJECT} characters.`, draft);
   if (!body) return newForm(env, user, staff, "Write something first.", draft);
@@ -246,7 +249,7 @@ async function createFromForm(req: Request, env: Env, user: User, staff: boolean
   if (!staff && (recent?.n ?? 0) >= NEW_TICKETS_PER_HOUR) return newForm(env, user, staff, "That's a lot of tickets in an hour. Try again later.", draft);
   let images: ImageAttachment[];
   try { images = await formImages(form); } catch (error) { return newForm(env, user, staff, (error as Error).message, draft); }
-  await env.DB.prepare("UPDATE users SET support_email = ? WHERE id = ?").bind(email, user.id).run();
+  await env.DB.prepare("UPDATE users SET support_email = ? WHERE id = ? AND deactivated_at = 0 AND deleted_at = 0").bind(email, user.id).run();
   const { ticket } = await openTicket(env, { subject, body, email, name: user.name, userId: user.id, emailId: null, images });
   return redirect(link(env, `/tickets/${ticket.id}`));
 }
@@ -273,7 +276,7 @@ export async function openTicket(
   // The receipt is what an emailed reply answers when the ticket came from the site.
   if (!t.emailId) await env.DB.prepare("UPDATE ticket_messages SET email_id = ? WHERE id = ?").bind(receiptId, first!.id).run();
   await Promise.all([
-    sendMail(env, {
+    t.email ? sendMail(env, {
       to: [t.email],
       subject: `[#${ticket.id}] ${ticket.subject}`,
       text: `Thanks for getting in touch. We've got your message and will answer as soon as we can.\n\nTo add anything, reply to this email or open the ticket:\n${keyLink(env, ticket.id, key)}\n\n---\n${t.body}`,
@@ -282,7 +285,7 @@ export async function openTicket(
       inReplyTo: t.emailId ?? undefined,
       references: t.emailId ? [t.emailId] : undefined,
       automated: true,
-    }),
+    }) : Promise.resolve(false),
     notifyStaff(env, ticket, `New ticket from ${t.name || t.email} <${t.email}>`, t.body, t.images),
   ]);
   return { ticket, key };
@@ -304,7 +307,7 @@ async function canRead(env: Env, user: User | null, staff: boolean, t: Ticket, k
 }
 
 export async function loadTicket(env: Env, id: number): Promise<Ticket | null> {
-  return env.DB.prepare("SELECT * FROM tickets WHERE id = ?").bind(id).first<Ticket>();
+  return env.DB.prepare("SELECT t.*, coalesce(u.deleted_at,0) AS account_deleted FROM tickets t LEFT JOIN users u ON u.id = t.user_id WHERE t.id = ?").bind(id).first<Ticket>();
 }
 
 async function ticketPage(env: Env, user: User | null, staff: boolean, id: number, key: string | null, error = "", draft = ""): Promise<Response> {
@@ -338,7 +341,7 @@ async function ticketPage(env: Env, user: User | null, staff: boolean, id: numbe
   const replyForm = `<form class="comment-form" enctype="multipart/form-data" method="post" action="${action}" id="reply">${keyField}
       ${error ? `<p class="risky">${esc(error)}</p>` : ""}
       <label class="sr" for="body">Reply</label>
-      <textarea id="body" name="body" rows="6" required maxlength="${MAX_BODY}" placeholder="${staff ? `Your answer is emailed to ${esc(t.email)}` : "Add a reply"}">${esc(draft)}</textarea>
+      <textarea id="body" name="body" rows="6" required maxlength="${MAX_BODY}" placeholder="${staff ? `${t.email ? `Your answer is emailed to ${esc(t.email)}` : "Your answer appears in the requester’s My tickets"}` : "Add a reply"}">${esc(draft)}</textarea>
       ${imageField}
       <p class="form-foot"><span class="muted">${staff ? "Plain text. A note stays here and isn't emailed." : t.status === "closed" ? "Replying opens the ticket again." : "Plain text. Links work."}</span>
       <span>${staff ? `<button name="kind" value="note">Add note</button> ` : ""}<button class="primary" name="kind" value="${staff ? "staff" : "requester"}">${staff ? "Send answer" : "Send reply"}</button></span></p>
@@ -357,7 +360,7 @@ async function ticketPage(env: Env, user: User | null, staff: boolean, id: numbe
     staff,
     `${crumbs}<h1>${esc(t.subject)} <span class="version">#${t.id}</span></h1>
      <p>${statusMark(t.status, staff)}</p>${staffBits}
-     <ol class="thread comment-list">${items}</ol>${replyForm}`,
+     <ol class="thread comment-list">${items}</ol>${t.account_deleted ? '<p class="muted">This account was deleted. The ticket is read-only.</p>' : replyForm}`,
     error ? 400 : 200,
     shell(env, user, staff),
   );
@@ -368,6 +371,7 @@ async function reply(req: Request, env: Env, user: User | null, staff: boolean, 
   const key = String(form.get("k") ?? "") || null;
   const t = await loadTicket(env, id);
   if (!t || !(await canRead(env, user, staff, t, key))) return notFound(env, user, staff);
+  if (t.account_deleted) return new Response("This account was deleted. The ticket is read-only.",{status:409});
   const body = tidy(String(form.get("body") ?? ""));
   const asked = String(form.get("kind") ?? "");
   const kind = staff ? (asked === "note" ? "note" : "staff") : "requester";
@@ -392,7 +396,7 @@ export async function addMessage(env: Env, t: Ticket, kind: "requester" | "staff
   await env.DB.prepare("UPDATE tickets SET status = ?, updated_at = ? WHERE id = ?").bind(status, now, t.id).run();
   if (kind === "requester") {
     await notifyStaff(env, t, `${t.name || t.email} replied${t.status === "closed" ? " and reopened it" : ""}:`, body, images);
-  } else if (kind === "staff") {
+  } else if (kind === "staff" && t.email) {
     // Threads under everything sent or received so far, so mail apps keep one conversation.
     const { results } = await env.DB.prepare("SELECT email_id FROM ticket_messages WHERE ticket_id = ? AND email_id IS NOT NULL ORDER BY id")
       .bind(t.id)

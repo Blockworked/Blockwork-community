@@ -19,6 +19,7 @@ export interface CommentRow {
   name: string;
   avatar: string;
   public_id: string | null;
+  username?: string | null;
 }
 
 /** Trims a comment and says why it can't be posted, if it can't. */
@@ -48,8 +49,8 @@ export function canDelete(user: User | null, admin: boolean, ownerId: string, c:
 /** A pack's comments, oldest first, leaving out deleted ones and banned accounts'. */
 export async function listComments(env: Env, packId: string): Promise<CommentRow[]> {
   const { results } = await env.DB.prepare(
-    `SELECT c.id, c.user_id, c.body, c.created_at, u.name, u.avatar, u.public_id FROM comments c JOIN users u ON u.id = c.user_id
-     WHERE c.pack_id = ? AND c.deleted_at IS NULL AND u.banned = 0 ORDER BY c.created_at LIMIT 500`,
+    `SELECT c.id, c.user_id, c.body, c.created_at, u.name, u.avatar, u.public_id, u.username FROM comments c JOIN users u ON u.id = c.user_id
+     WHERE c.pack_id = ? AND c.deleted_at IS NULL AND u.banned = 0 AND u.deactivated_at = 0 AND u.deleted_at = 0 ORDER BY c.created_at LIMIT 500`,
   )
     .bind(packId)
     .all<CommentRow>();
@@ -62,7 +63,7 @@ export async function commentsSection(env: Env, user: User | null, admin: boolea
   const items = results
     .map((c) => {
       const who = `${esc(c.name)}${c.user_id === OFFICIAL_OWNER ? verifiedBadge() : ""}`;
-      const name = c.public_id ? `<a href="/authors/${encodeURIComponent(c.public_id)}">${who}</a>` : who;
+      const name = (c.username || c.public_id) ? `<a href="/authors/${encodeURIComponent((c.username || c.public_id)!)}">${who}</a>` : who;
       const badge = c.user_id === p.owner_id ? ` <span class="mark">${PEN}made this pack</span>` : "";
       const del = canDelete(user, admin, p.owner_id, c)
         ? `<form class="inline" method="post" action="/comments/${c.id}/delete"><button class="ghost small" title="Delete this comment">Delete</button></form>`
@@ -98,7 +99,7 @@ export async function addComment(
   packId: string,
   raw: string,
 ): Promise<{ id: number } | { error: string; status: number }> {
-  const pack = await env.DB.prepare("SELECT 1 FROM packs p JOIN users u ON u.id = p.owner_id WHERE p.id = ? AND p.listed = 1 AND u.banned = 0")
+  const pack = await env.DB.prepare("SELECT 1 FROM packs p JOIN users u ON u.id = p.owner_id WHERE p.id = ? AND p.listed = 1 AND u.banned = 0 AND u.deactivated_at = 0 AND u.deleted_at = 0")
     .bind(packId)
     .first();
   if (!pack) return { error: "That pack isn't in the library.", status: 404 };
