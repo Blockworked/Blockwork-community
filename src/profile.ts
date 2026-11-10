@@ -75,9 +75,10 @@ export async function profileRoute(req: Request, env: Env, user: User | null): P
     try {
       const result = await env.DB.prepare(`UPDATE users SET username = ?, username_changed_at = ? WHERE ${guard}
         AND NOT EXISTS (SELECT 1 FROM users occupied WHERE occupied.public_id = ? AND occupied.id != users.id)
-        AND (? = 0 OR username_changed_at <= ?) AND NOT EXISTS (SELECT 1 FROM username_history WHERE username = ? AND user_id != ? AND hold_until > ?)`)
-        .bind(username,now,...guardValues(),username,cooldown,now - cooldown,username,user.id,now).run();
-      changed = result.meta.changes === 1;
+        AND (? = 0 OR username_changed_at <= ?) AND NOT EXISTS (SELECT 1 FROM username_history WHERE username = ? AND user_id != ? AND hold_until > ?) RETURNING id`)
+        .bind(username,now,...guardValues(),username,cooldown,now - cooldown,username,user.id,now).first<{id:string}>();
+      // D1 counts trigger writes in meta.changes; RETURNING identifies the user update itself.
+      changed = !!result;
     } catch (e) {
       if (!String(e).includes('UNIQUE constraint')) throw e;
     }
