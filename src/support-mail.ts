@@ -86,6 +86,7 @@ export interface Outgoing {
   references?: string[];
   /** A receipt or notice rather than a person's words. */
   automated?: boolean;
+  attachments?: { filename: string; fileblob: string; mimetype: string }[];
 }
 
 /** Sends through smtp2go. Without an API key (local runs) it only logs. Never throws. */
@@ -104,6 +105,7 @@ export async function sendMail(env: Env, mail: Outgoing): Promise<boolean> {
   try {
     const res = await fetch("https://api.smtp2go.com/v3/email/send", {
       method: "POST",
+      signal: AbortSignal.timeout(10000),
       headers: { "Content-Type": "application/json", "X-Smtp2go-Api-Key": env.SMTP2GO_API_KEY },
       body: JSON.stringify({
         sender: `Blockworked Support <${fromAddress(env)}>`,
@@ -111,6 +113,7 @@ export async function sendMail(env: Env, mail: Outgoing): Promise<boolean> {
         subject: mail.subject,
         text_body: mail.text,
         custom_headers: headers,
+        attachments: mail.attachments,
       }),
     });
     if (!res.ok) {

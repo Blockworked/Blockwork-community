@@ -1,3 +1,5 @@
+import { notify } from "./notifications.ts";
+import { formImages, imageField, mailImages, storeImages, type ImageAttachment, type StoredImage } from "./support-attachments.ts";
 // The helpdesk at support.blockworked.com. Anyone signed in to the community
 // site can file a ticket, and anyone can email support@. Staff answer here;
 // every answer is emailed to whoever filed the ticket, and they can reply by
@@ -105,6 +107,14 @@ export async function supportRoute(req: Request, env: Env, path: string, user: U
   const staff = isStaff(env, user);
   const url = new URL(req.url);
   let m: RegExpMatchArray | null;
+  if (method === "GET" && (m = path.match(/^\/attachments\/([a-f0-9-]{36})$/))) {
+    const image = await env.DB.prepare("SELECT a.*, m.ticket_id, m.kind FROM ticket_attachments a JOIN ticket_messages m ON m.id = a.message_id WHERE a.id = ?").bind(m[1]).first<StoredImage & { ticket_id: number; kind: string }>();
+    const ticket = image ? await loadTicket(env, image.ticket_id) : null;
+    if (!image || !ticket || (image.kind === "note" && !staff) || !(await canRead(env, user, staff, ticket, url.searchParams.get("k")))) return notFound(env, user, staff);
+    const object = await env.PACKS.get(`support/${image.id}`);
+    if (!object) return notFound(env, user, staff);
+    return new Response(object.body, { headers: { "Content-Type": image.type, "Cache-Control": "private, no-store", "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(image.name)}`, "Referrer-Policy": "no-referrer" } });
+  }
   if (method === "GET" && path === "/") return home(env, user, staff);
   if (method === "GET" && path === "/login") return loginPage(env, user, staff, url.searchParams.get("next") ?? "/");
   if (path === "/new") {
@@ -197,7 +207,7 @@ function newForm(env: Env, user: User, staff: boolean, error = "", draft: { subj
     user,
     staff,
     `<h1>New ticket</h1>
-     <form class="support-form comment-form" method="post" action="${link(env, "/new")}">
+     <form class="support-form comment-form" enctype="multipart/form-data" method="post" action="${link(env, "/new")}">
        ${error ? `<p class="risky">${esc(error)}</p>` : ""}
        <label class="field" for="email">Your email</label>
        <input type="email" id="email" name="email" required maxlength="254" autocomplete="email" value="${esc(draft.email ?? savedEmail)}">
@@ -206,6 +216,7 @@ function newForm(env: Env, user: User, staff: boolean, error = "", draft: { subj
        <input type="text" id="subject" name="subject" required maxlength="${MAX_SUBJECT}" value="${esc(draft.subject ?? "")}">
        <label class="field" for="body">What's going on?</label>
        <textarea id="body" name="body" required maxlength="${MAX_BODY}" placeholder="What you were doing, what happened, and your Blockwork version if it's about the app">${esc(draft.body ?? "")}</textarea>
+       ${imageField}
        <p class="form-foot"><span class="muted">Plain text. Links work.</span><button class="primary">Send</button></p>
      </form>`,
     error ? 400 : 200,
@@ -233,15 +244,17 @@ async function createFromForm(req: Request, env: Env, user: User, staff: boolean
     .bind(user.id, Date.now() - 3600_000)
     .first<{ n: number }>();
   if (!staff && (recent?.n ?? 0) >= NEW_TICKETS_PER_HOUR) return newForm(env, user, staff, "That's a lot of tickets in an hour. Try again later.", draft);
+  let images: ImageAttachment[];
+  try { images = await formImages(form); } catch (error) { return newForm(env, user, staff, (error as Error).message, draft); }
   await env.DB.prepare("UPDATE users SET support_email = ? WHERE id = ?").bind(email, user.id).run();
-  const { ticket } = await openTicket(env, { subject, body, email, name: user.name, userId: user.id, emailId: null });
+  const { ticket } = await openTicket(env, { subject, body, email, name: user.name, userId: user.id, emailId: null, images });
   return redirect(link(env, `/tickets/${ticket.id}`));
 }
 
 /** Files a ticket and sends the receipt and the staff notice. Returns it and its key. */
 export async function openTicket(
   env: Env,
-  t: { subject: string; body: string; email: string; name: string; userId: string | null; emailId: string | null },
+  t: { subject: string; body: string; email: string; name: string; userId: string | null; emailId: string | null; images?: ImageAttachment[] },
 ): Promise<{ ticket: Ticket; key: string }> {
   const now = Date.now();
   const key = randomToken();
@@ -255,6 +268,7 @@ export async function openTicket(
   )
     .bind(ticket.id, t.userId, t.body, t.emailId, now)
     .first<{ id: number }>();
+  await storeImages(env, first!.id, t.images ?? []);
   const receiptId = messageId(env, ticket.id, first!.id);
   // The receipt is what an emailed reply answers when the ticket came from the site.
   if (!t.emailId) await env.DB.prepare("UPDATE ticket_messages SET email_id = ? WHERE id = ?").bind(receiptId, first!.id).run();
@@ -263,12 +277,13 @@ export async function openTicket(
       to: [t.email],
       subject: `[#${ticket.id}] ${ticket.subject}`,
       text: `Thanks for getting in touch. We've got your message and will answer as soon as we can.\n\nTo add anything, reply to this email or open the ticket:\n${keyLink(env, ticket.id, key)}\n\n---\n${t.body}`,
+      attachments: mailImages(t.images ?? []),
       messageId: receiptId,
       inReplyTo: t.emailId ?? undefined,
       references: t.emailId ? [t.emailId] : undefined,
       automated: true,
     }),
-    notifyStaff(env, ticket, `New ticket from ${t.name || t.email} <${t.email}>`, t.body),
+    notifyStaff(env, ticket, `New ticket from ${t.name || t.email} <${t.email}>`, t.body, t.images),
   ]);
   return { ticket, key };
 }
@@ -277,15 +292,8 @@ function keyLink(env: Env, id: number, key: string): string {
   return link(env, `/tickets/${id}?k=${encodeURIComponent(key)}`);
 }
 
-async function notifyStaff(env: Env, ticket: Ticket, headline: string, body: string): Promise<void> {
-  const to = (env.SUPPORT_NOTIFY ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  if (!to.length) return;
-  await sendMail(env, {
-    to,
-    subject: `[#${ticket.id}] ${ticket.subject}`,
-    text: `${headline}\n\n${body}\n\n---\nAnswer it here (replies to this email aren't read):\n${link(env, `/tickets/${ticket.id}`)}`,
-    automated: true,
-  });
+async function notifyStaff(env: Env, ticket: Ticket, headline: string, body: string, images: ImageAttachment[] = []): Promise<void> {
+  await notify(env, { title: `[#${ticket.id}] ${ticket.subject}`, text: `${headline}\n\n${body}`, url: link(env, `/tickets/${ticket.id}`), attachments: mailImages(images) });
 }
 
 /** Whether this visitor may read the ticket: staff, the account that filed it, or the emailed key. */
@@ -308,6 +316,7 @@ async function ticketPage(env: Env, user: User | null, staff: boolean, id: numbe
   )
     .bind(id)
     .all<TicketMessage>();
+  const attachments = await env.DB.prepare("SELECT a.* FROM ticket_attachments a JOIN ticket_messages m ON m.id = a.message_id WHERE m.ticket_id = ?").bind(id).all<StoredImage>();
   const items = results
     .filter((m) => staff || m.kind !== "note")
     .map((m) => {
@@ -316,16 +325,21 @@ async function ticketPage(env: Env, user: User | null, staff: boolean, id: numbe
       const avatar = m.avatar
         ? `<img class="avatar" src="${esc(m.avatar)}" alt="">`
         : `<span class="avatar blank" aria-hidden="true">${esc((name || "?").slice(0, 1).toUpperCase())}</span>`;
+      const images = attachments.results.filter(a => a.message_id === m.id).map(a => {
+        const url = link(env, `/attachments/${a.id}${key ? `?k=${encodeURIComponent(key)}` : ""}`);
+        return `<a href="${esc(url)}" target="_blank" rel="noreferrer"><img src="${esc(url)}" alt="${esc(a.name)}" loading="lazy" style="max-width:100%;max-height:320px"><span>${esc(a.name)}</span></a>`;
+      }).join("");
       return `<li class="comment ${m.kind}" id="m-${m.id}">${avatar}<div class="comment-main"><div class="comment-meta"><strong>${esc(name)}</strong>${pill}
-        <a class="muted" href="#m-${m.id}">${esc(when(m.created_at))}</a></div><p class="comment-body">${commentHtml(m.body)}</p></div></li>`;
+        <a class="muted" href="#m-${m.id}">${esc(when(m.created_at))}</a></div><p class="comment-body">${commentHtml(m.body)}</p><div class="support-images">${images}</div></div></li>`;
     })
     .join("");
   const action = link(env, `/tickets/${t.id}/reply`);
   const keyField = key ? `<input type="hidden" name="k" value="${esc(key)}">` : "";
-  const replyForm = `<form class="comment-form" method="post" action="${action}" id="reply">${keyField}
+  const replyForm = `<form class="comment-form" enctype="multipart/form-data" method="post" action="${action}" id="reply">${keyField}
       ${error ? `<p class="risky">${esc(error)}</p>` : ""}
       <label class="sr" for="body">Reply</label>
       <textarea id="body" name="body" rows="6" required maxlength="${MAX_BODY}" placeholder="${staff ? `Your answer is emailed to ${esc(t.email)}` : "Add a reply"}">${esc(draft)}</textarea>
+      ${imageField}
       <p class="form-foot"><span class="muted">${staff ? "Plain text. A note stays here and isn't emailed." : t.status === "closed" ? "Replying opens the ticket again." : "Plain text. Links work."}</span>
       <span>${staff ? `<button name="kind" value="note">Add note</button> ` : ""}<button class="primary" name="kind" value="${staff ? "staff" : "requester"}">${staff ? "Send answer" : "Send reply"}</button></span></p>
     </form>`;
@@ -358,23 +372,26 @@ async function reply(req: Request, env: Env, user: User | null, staff: boolean, 
   const asked = String(form.get("kind") ?? "");
   const kind = staff ? (asked === "note" ? "note" : "staff") : "requester";
   if (!body) return ticketPage(env, user, staff, id, key, "Write something first.", "");
-  await addMessage(env, t, kind, staff || t.user_id === user?.id ? (user?.id ?? null) : null, body, null);
+  let images: ImageAttachment[];
+  try { images = await formImages(form); } catch (error) { return ticketPage(env, user, staff, id, key, (error as Error).message, body); }
+  await addMessage(env, t, kind, staff || t.user_id === user?.id ? (user?.id ?? null) : null, body, null, images);
   const back = key ? `/tickets/${id}?k=${encodeURIComponent(key)}` : `/tickets/${id}`;
   return redirect(link(env, back));
 }
 
 /** Adds to a ticket's thread, moves its status along and sends whatever email that calls for. */
-export async function addMessage(env: Env, t: Ticket, kind: "requester" | "staff" | "note", userId: string | null, body: string, emailId: string | null): Promise<void> {
+export async function addMessage(env: Env, t: Ticket, kind: "requester" | "staff" | "note", userId: string | null, body: string, emailId: string | null, images: ImageAttachment[] = []): Promise<void> {
   const now = Date.now();
   const row = await env.DB.prepare(
     "INSERT INTO ticket_messages (ticket_id, kind, user_id, body, email_id, created_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
   )
     .bind(t.id, kind, userId, body, emailId, now)
     .first<{ id: number }>();
+  await storeImages(env, row!.id, images);
   const status: Status = kind === "requester" ? "open" : kind === "staff" ? "answered" : t.status;
   await env.DB.prepare("UPDATE tickets SET status = ?, updated_at = ? WHERE id = ?").bind(status, now, t.id).run();
   if (kind === "requester") {
-    await notifyStaff(env, t, `${t.name || t.email} replied${t.status === "closed" ? " and reopened it" : ""}:`, body);
+    await notifyStaff(env, t, `${t.name || t.email} replied${t.status === "closed" ? " and reopened it" : ""}:`, body, images);
   } else if (kind === "staff") {
     // Threads under everything sent or received so far, so mail apps keep one conversation.
     const { results } = await env.DB.prepare("SELECT email_id FROM ticket_messages WHERE ticket_id = ? AND email_id IS NOT NULL ORDER BY id")
@@ -387,6 +404,7 @@ export async function addMessage(env: Env, t: Ticket, kind: "requester" | "staff
       to: [t.email],
       subject: `Re: [#${t.id}] ${t.subject}`,
       text: `${body}\n\n---\nReply to this email to answer, or see the whole conversation:\n${keyLink(env, t.id, t.access_key)}`,
+      attachments: mailImages(images),
       messageId: outgoing,
       inReplyTo: refs[refs.length - 1],
       references: refs,

@@ -1,3 +1,4 @@
+import { notify } from "./notifications.ts";
 // What Blockwork's Block library talks to: sign-in through the browser
 // (a loopback redirect with PKCE), then JSON over a bearer token for pack
 // pages, comments, the signed-in account's packs and uploads.
@@ -209,7 +210,9 @@ export async function acceptUpload(
   const listed = pack
     ? await env.DB.prepare("SELECT 1 FROM versions WHERE pack_id = ? AND status = 'approved' LIMIT 1").bind(meta.id).first()
     : null;
-  await env.DB.batch(statements);
+  const saved = await env.DB.batch(statements);
+  const versionId = saved[saved.length - 1].meta.last_row_id;
+  await notify(env, { title: `Pack submission: ${meta.name}`, text: `${user.name} submitted ${meta.name} (${meta.version}) for review.`, url: `${env.SITE_URL}/admin/versions/${versionId}` });
   return { meta, sha, update: !!listed };
 }
 

@@ -11,3 +11,9 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 # Optional; without it ticket mail is only logged.
 SMTP2GO_API_KEY=
+
+# Optional staff notifications for pack uploads, tickets and requester replies.
+NTFY_TOPIC=
+NTFY_TOKEN=
+NTFY_URL=https://ntfy.sh
+DISCORD_WEBHOOK_URL=
