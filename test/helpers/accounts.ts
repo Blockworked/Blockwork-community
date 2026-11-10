@@ -20,7 +20,12 @@ export function fixture(beforeConnections?: (sql: DatabaseSync) => void) {
     bind(...values: unknown[]) { this.values = values; return this; }
     async first() { return sql.prepare(this.query).get(...this.values as any[]) ?? null; }
     async all() { return {results: sql.prepare(this.query).all(...this.values as any[])}; }
-    async run() { const result = sql.prepare(this.query).run(...this.values as any[]); return {meta: {changes: Number(result.changes)}}; }
+    async run() {
+      // D1 reports total changes, including writes performed by triggers.
+      const before = Number(sql.prepare('SELECT total_changes() AS n').get()!.n);
+      sql.prepare(this.query).run(...this.values as any[]);
+      return {meta: {changes: Number(sql.prepare('SELECT total_changes() AS n').get()!.n) - before}};
+    }
   }
   const db = {prepare: (q: string) => new Statement(q), async batch(statements: Statement[]) {
     sql.exec('BEGIN IMMEDIATE');

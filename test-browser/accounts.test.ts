@@ -192,6 +192,12 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
     await page.getByRole('button',{name:'Save username'}).click();
     await expect(page.getByLabel('Username',{exact:true})).toHaveValue('browser_user');
     await expect(page.getByRole('button',{name:'Save username'})).toBeEnabled();
+    for (const username of ['browser_user_changed','browser_user']) {
+      await page.getByLabel('Username',{exact:true}).fill(username);
+      await page.getByRole('button',{name:'Save username'}).click();
+      await expect(page.getByLabel('Username',{exact:true})).toHaveValue(username);
+      await expect(page.getByRole('alert')).toHaveCount(0);
+    }
     await page.getByRole('link',{name:/View public profile/}).click();
     await expect(page.getByRole('heading',{name:'Updated Browser User',exact:true})).toBeVisible();
     await expect(page.getByText('@browser_user',{exact:true})).toBeVisible();
