@@ -114,7 +114,7 @@ button.large, .button.large { min-height: 44px; padding: 0 20px; font-size: 15px
 .signin { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 20px; }
 .signin .button { min-width: 240px; }
 form.inline { display: inline; }
-input[type=text], input[type=file] { font: inherit; font-size: 13px; padding: 7px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg2); color: var(--fg); width: min(100%, 420px); transition: box-shadow 120ms var(--ease), border-color 120ms var(--ease); }
+input[type=text], input[type=email], input[type=password], input[type=file] { font: inherit; font-size: 13px; padding: 7px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg2); color: var(--fg); width: min(100%, 420px); transition: box-shadow 120ms var(--ease), border-color 120ms var(--ease); }
 input[type=text]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.28); }
 input[type=file]::file-selector-button { font: inherit; margin-right: 10px; padding: 5px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg3); color: var(--fg); cursor: pointer; }
 
@@ -149,7 +149,7 @@ export interface Shell {
 
 export function libraryShell(user: User | null, admin: boolean): Shell {
   const nav = user
-    ? `<a href="/submit">Submit a pack</a><a href="/me">My packs</a>${admin ? `<a href="/admin">Review</a>` : ""}
+    ? `<a href="/submit">Submit a pack</a><a href="/me">My packs</a><a href="/account">Account security</a>${admin ? `<a href="/admin">Review</a>` : ""}
        <span class="who">${user.avatar ? `<img class="avatar" src="${esc(user.avatar)}" alt="">` : ""}${esc(user.name)}</span>
        <form class="inline" method="post" action="/auth/logout"><button class="ghost">Sign out</button></form>`
     : `<a href="/login">Sign in</a>`;
@@ -181,7 +181,17 @@ export function verifiedBadge(): string {
   return `<span class="verified" title="Verified official pack" role="img" aria-label="Verified official pack"><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="currentColor"/><path d="M4.6 8.3l2.2 2.2 4.6-4.8" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
 }
 
-export function loginPage(user: User | null, next: string): Response {
+function input(name: string, label: string, type = 'text', autocomplete = name): string {
+  return `<p><label>${esc(label)}<br><input name="${esc(name)}" type="${type}" autocomplete="${autocomplete}" required ${type === 'password' ? 'minlength="15" maxlength="128"' : 'maxlength="254"'}></label></p>`;
+}
+export function emailLogin(next: string): string {
+  return `<div class="card"><h2>Sign in with email</h2><form method="post" action="/auth/email/login">
+    <input type="hidden" name="next" value="${esc(next)}">${input('email', 'Email', 'email', 'username')}${input('password', 'Password', 'password', 'current-password')}
+    <button class="primary">Sign in</button></form><p><a href="/auth/email/signup">Create an account</a> · <a href="/auth/email/forgot">Forgot password?</a></p></div>
+    <button type="button" data-passkey="login" data-next="${esc(next || '/account')}">Sign in with a passkey</button><p id="auth-status" role="status"></p><script src="/account.js" defer></script>`;
+}
+
+export function loginPage(user: User | null, next: string, local = false): Response {
   const q = next ? `?next=${encodeURIComponent(next)}` : "";
   const buttons = Object.entries(PROVIDERS)
     .map(([id, name]) => `<a class="button large" href="/auth/${id}/login${q}">Sign in with ${esc(name)}</a>`)
@@ -190,7 +200,7 @@ export function loginPage(user: User | null, next: string): Response {
     "Sign in",
     user,
     false,
-    `<h1>Sign in</h1><p class="muted">An account is needed to submit packs. Browsing doesn't need one.</p><div class="signin">${buttons}</div>`,
+    `<h1>Sign in</h1><p class="muted">An account is needed to submit packs. Browsing doesn't need one.</p><div class="signin">${buttons}</div>${local ? emailLogin(next) : ""}`,
   );
 }
 

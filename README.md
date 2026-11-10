@@ -46,3 +46,10 @@ npm run typecheck
 Anyone can host an `index.json` in this format and its pack files over HTTPS.
 People add the library's address in Blockwork's settings. The starter packs
 in `packs/` and the repository's `index.json` remain available to older releases.
+
+## Email accounts and passkeys
+
+The Worker supports verified email/password accounts, passkeys, authenticator
+apps, backup codes, password reset and audited support recovery without
+impersonation. See [Account security and rollout](docs/accounts.md) for behavior,
+security controls, migration order and verification.

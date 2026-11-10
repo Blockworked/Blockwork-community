@@ -11,14 +11,21 @@
     "seed:remote": "node scripts/seed.js --remote",
     "typecheck": "tsc --noEmit",
     "test": "node --test test/*.test.ts",
-    "test:runtime": "python3 scripts/test-pack-runtime.py"
+    "test:runtime": "python3 scripts/test-pack-runtime.py",
+    "test:browser": "node --test test-browser/*.test.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261019.1",
+    "@playwright/test": "^1.65.0",
+    "miniflare": "^5.20261019.1-beta",
     "typescript": "^7.0.2",
     "wrangler": "^4.151.3"
   },
   "dependencies": {
-    "postal-mime": "^2.4.4"
+    "@noble/hashes": "^2.4.0",
+    "@simplewebauthn/server": "^14.1.0",
+    "otpauth": "^9.6.0",
+    "postal-mime": "^2.4.4",
+    "qrcode-generator": "^2.0.4"
   }
 }

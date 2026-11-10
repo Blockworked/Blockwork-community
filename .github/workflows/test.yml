@@ -18,6 +18,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
 
   # Checks against Blockwork at the commit in .blockwork-rev: the capability
   # table copy, the slug cases and every official pack run by Blockwork's real

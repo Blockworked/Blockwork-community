@@ -10,6 +10,9 @@ routes = [
 ]
 
 [vars]
+# Enable after following docs/accounts.md; this requires migrations 0012/0013 even when disabled.
+LOCAL_AUTH_ENABLED = "true"
+AUTH_FROM = "support@blockworked.com"
 # The address the site is served at; OAuth callbacks go to <SITE_URL>/auth/<provider>/callback.
 SITE_URL = "https://community.blockworked.com"
 # The main site, which the top nav shared with it links to (src/site-nav.ts).
@@ -38,7 +41,16 @@ bucket_name = "blockwork-library"
 
 # Secrets (wrangler secret put, or .dev.vars locally):
 # GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
-# SMTP2GO_API_KEY (email; without it mail is only logged)
 # NTFY_TOPIC (private topic), NTFY_TOKEN (optional access token),
 # DISCORD_WEBHOOK_URL (channel webhook URL)
 # Set NTFY_URL as a var for a self-hosted server; defaults to https://ntfy.sh.
+# SMTP2GO_API_KEY (ticket/account email; account mail never logs tokens),
+# AUTH_TOTP_KEY (32 random bytes in base64url, no padding; encrypts authenticator seeds)
+
+# Memory-hard password hashing needs a paid Workers plan. Benchmark before rollout.
+[limits]
+cpu_ms = 30000
+
+[triggers]
+crons = ["17 * * * *"]
+

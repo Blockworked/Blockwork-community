@@ -45,6 +45,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
 
       # Applies only the migrations D1 hasn't seen yet, so it's a no-op
       # when none landed. Runs before the deploy so new code finds its tables.

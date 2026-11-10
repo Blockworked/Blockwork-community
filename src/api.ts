@@ -3,7 +3,7 @@ import { notify } from "./notifications.ts";
 // (a loopback redirect with PKCE), then JSON over a bearer token for pack
 // pages, comments, the signed-in account's packs and uploads.
 
-import { hash, isAdmin, isReservedName, randomToken, type User } from "./auth.ts";
+import { cookies, hash, isAdmin, isReservedName, randomToken, type User } from "./auth.ts";
 import type { Env } from "./index.ts";
 import { esc, page } from "./pages.ts";
 import { OFFICIAL_OWNER, readPack, sha256Hex, stampPack, type PackMeta } from "./packs.ts";
@@ -31,7 +31,7 @@ export async function bearerUser(req: Request, env: Env): Promise<User | null> {
   )
     .bind(await hash(m[1]), Date.now())
     .first<User>();
-  return user && isReservedName(user.name) && !isAdmin(env, user) ? null : user;
+  return user && (user.banned || (isReservedName(user.name) && !isAdmin(env, user))) ? null : user;
 }
 
 // Sign-in
@@ -93,16 +93,12 @@ export async function appLoginConfirm(req: Request, env: Env, user: User | null)
   if (!ask) return page("Sign in to Blockwork", user, false, `<h1>Sign in to Blockwork</h1><p>That sign-in link isn't right. Start again from Blockwork.</p>`, 400);
   if (!user) return new Response(null, { status: 303, headers: { Location: "/login" } });
   const code = randomToken();
-  await env.DB.batch([
-    env.DB.prepare("DELETE FROM app_codes WHERE expires_at < ?").bind(Date.now()),
-    env.DB.prepare("INSERT INTO app_codes (code_hash, user_id, challenge, label, expires_at) VALUES (?, ?, ?, ?, ?)").bind(
-      await hash(code),
-      user.id,
-      ask.challenge,
-      ask.label,
-      Date.now() + CODE_MINUTES * 60_000,
-    ),
-  ]);
+  const sessionHashes = await Promise.all(cookies(req, "session").slice(0, 2).map(hash));
+  const result = await env.DB.prepare(`INSERT INTO app_codes (code_hash, user_id, challenge, label, expires_at, auth_version)
+    SELECT ?, u.id, ?, ?, ?, u.auth_version FROM users u WHERE u.id = ? AND u.banned = 0
+    AND EXISTS (SELECT 1 FROM sessions s WHERE s.user_id = u.id AND s.kind = 'web' AND s.expires_at > ? AND s.token_hash IN (?, ?))`)
+    .bind(await hash(code), ask.challenge, ask.label, Date.now() + CODE_MINUTES * 60_000, user.id, Date.now(), sessionHashes[0] ?? "", sessionHashes[1] ?? "").run();
+  if (result.meta.changes !== 1) return new Response(null, {status: 303, headers: {Location: "/login"}});
   return new Response(null, { status: 303, headers: { Location: loopback(ask, { code }) } });
 }
 
@@ -139,19 +135,20 @@ async function token(req: Request, env: Env): Promise<Response> {
   if (typeof code !== "string" || typeof verifier !== "string" || !/^[A-Za-z0-9._~-]{43,128}$/.test(verifier)) {
     return fail("That sign-in didn't work. Try again.");
   }
-  const row = await env.DB.prepare("DELETE FROM app_codes WHERE code_hash = ? RETURNING user_id, challenge, label, expires_at")
+  const row = await env.DB.prepare("DELETE FROM app_codes WHERE code_hash = ? RETURNING user_id, challenge, label, expires_at, auth_version")
     .bind(await hash(code))
-    .first<{ user_id: string; challenge: string; label: string; expires_at: number }>();
+    .first<{ user_id: string; challenge: string; label: string; expires_at: number; auth_version: number }>();
   if (!row || row.expires_at < Date.now() || row.challenge !== (await challengeOf(verifier))) {
     return fail("That sign-in didn't work. Try again.");
   }
   const user = await env.DB.prepare("SELECT id, name, avatar, banned FROM users WHERE id = ?").bind(row.user_id).first<User>();
-  if (!user) return fail("That sign-in didn't work. Try again.");
+  if (!user || user.banned) return fail("That sign-in didn't work. Try again.");
   const secret = randomToken();
   const now = Date.now();
-  await env.DB.prepare("INSERT INTO sessions (token_hash, user_id, expires_at, kind, label, created_at) VALUES (?, ?, ?, 'app', ?, ?)")
-    .bind(await hash(secret), user.id, now + APP_SESSION_DAYS * 86400_000, row.label, now)
-    .run();
+  const result = await env.DB.prepare(`INSERT INTO sessions (token_hash, user_id, expires_at, kind, label, created_at)
+    SELECT ?, id, ?, 'app', ?, ? FROM users WHERE id = ? AND auth_version = ? AND banned = 0`)
+    .bind(await hash(secret), now + APP_SESSION_DAYS * 86400_000, row.label, now, user.id, row.auth_version).run();
+  if (result.meta.changes !== 1) return fail("That sign-in didn't work. Try again.");
   return json({ token: secret, user: await profile(env, user) });
 }
 

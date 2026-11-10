@@ -1,6 +1,7 @@
-// GitHub and Google sign-in, and cookie sessions backed by D1.
+// Provider sign-in and shared cookie sessions backed by D1.
 
 import type { Env } from "./index.ts";
+import { finishPrimary, version } from "./account-security.ts";
 
 export interface User {
   id: string;
@@ -43,7 +44,7 @@ function setCookie(name: string, value: string, maxAge: number, path = "/", doma
 
 /** The session cookie, shared with the helpdesk's host when COOKIE_DOMAIN is set.
  *  Also clears the host-only one older sign-ins left, so only one is ever sent. */
-function sessionCookies(env: Env, token: string, maxAge: number): string[] {
+export function sessionCookies(env: Env, token: string, maxAge: number): string[] {
   const out = [setCookie("session", token, maxAge, "/", env.COOKIE_DOMAIN ?? "")];
   if (env.COOKIE_DOMAIN) out.unshift(setCookie("session", "", 0));
   return out;
@@ -77,14 +78,21 @@ export async function currentUser(req: Request, env: Env): Promise<User | null> 
       .bind(await hash(token), Date.now())
       .first<User>();
     // Sessions from before the name was reserved stop working.
-    if (user) return isReservedName(user.name) && !isAdmin(env, user) ? null : user;
+    if (user && !user.banned) return isReservedName(user.name) && !isAdmin(env, user) ? null : user;
   }
   return null;
 }
 
 /** Only same-site paths or the helpdesk, so a login link can't bounce someone to another site. */
 export function safeNext(next: string | null, env?: Pick<Env, "SUPPORT_URL">): string {
-  if (next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\")) return next;
+  if (next && /[\u0000-\u0020\u007f\\]/.test(next)) return "/";
+  if (next?.startsWith("/")) {
+    try {
+      const parsed = new URL(next, "https://redirect.invalid");
+      if (parsed.origin === "https://redirect.invalid") return parsed.pathname + parsed.search + parsed.hash;
+    } catch {}
+    return "/";
+  }
   if (next && env?.SUPPORT_URL) {
     try {
       const support = new URL(env.SUPPORT_URL);
@@ -186,19 +194,11 @@ export async function callback(req: Request, env: Env, provider: Provider): Prom
   )
     .bind(profile.id, profile.name.slice(0, 80), profile.avatar, now)
     .run();
-  const token = randomToken();
-  await env.DB.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)")
-    .bind(await hash(token), profile.id, now + SESSION_DAYS * 86400_000)
-    .run();
   let target = "/";
-  try {
-    target = safeNext(decodeURIComponent(next), env);
-  } catch {}
-  const headers = new Headers({ Location: target });
-  for (const c of sessionCookies(env, token, SESSION_DAYS * 86400)) headers.append("Set-Cookie", c);
-  if (env.COOKIE_DOMAIN) headers.append("Set-Cookie", setCookie("sd", "1", SESSION_DAYS * 86400, "/", env.COOKIE_DOMAIN));
-  headers.append("Set-Cookie", setCookie("oauth", "", 0, "/auth"));
-  return new Response(null, { status: 302, headers });
+  try { target = safeNext(decodeURIComponent(next), env); } catch {}
+  const response = await finishPrimary(env, profile.id, await version(env, profile.id), target);
+  response.headers.append("Set-Cookie", setCookie("oauth", "", 0, "/auth"));
+  return response;
 }
 
 /**
