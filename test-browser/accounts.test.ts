@@ -54,7 +54,7 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
       assert.equal(statement.trim(), '');
     }
     browser = await chromium.launch({headless: true, ...(process.env.CHROMIUM_PATH ? {executablePath: process.env.CHROMIUM_PATH} : {}), args: ['--no-sandbox']});
-    const context = await browser.newContext();
+    const context = await browser.newContext({reducedMotion:'reduce'});
     await context.route('https://github.com/login/oauth/authorize**', async route => {
       const authorization = new URL(route.request().url());
       providerChallenge = authorization.searchParams.get('code_challenge')!;
@@ -87,7 +87,7 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
     await login(initial);
     await expect(page.getByRole('heading', {name: 'Account security', exact: true})).toBeVisible();
     await page.getByRole('button', {name: 'Add passkey', exact: true}).click();
-    await expect(page).toHaveURL(origin + '/account?enrolled=1');
+    await expect(page).toHaveURL(origin + '/account/security?enrolled=1');
     await expect(page.locator('li').filter({hasText: 'My passkey'})).toBeVisible();
     await page.getByRole('button', {name: 'Generate new backup codes'}).click();
     await expect(page.getByRole('heading', {name: 'Save your backup codes'})).toBeVisible();
@@ -98,16 +98,16 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
     await login(initial);
     await expect(page.getByRole('heading', {name: 'Verify your sign-in'})).toBeVisible();
     await page.getByRole('button', {name: 'Use a passkey', exact: true}).click();
-    await expect(page).toHaveURL(origin + '/account');
+    await expect(page).toHaveURL(origin + '/account/security');
     await page.getByRole('button', {name: 'Sign out', exact: true}).click();
     await page.goto(origin + '/login');
     await page.getByRole('button', {name: 'Sign in with a passkey'}).click();
-    await expect(page).toHaveURL(origin + '/account');
+    await expect(page).toHaveURL(origin + '/account/security');
     await page.getByRole('button', {name: 'Sign out', exact: true}).click();
     await login(initial);
     await page.getByLabel('Backup code', {exact: true}).fill(backupCodes[0]);
     await page.getByRole('button', {name: 'Use backup code', exact: true}).click();
-    await expect(page).toHaveURL(origin + '/account');
+    await expect(page).toHaveURL(origin + '/account/security');
     await expect(page.getByText(/9 unused codes/)).toBeVisible();
     await page.goto(origin + '/auth/email/forgot');
     await page.getByLabel('Email', {exact: true}).fill('browser@example.com');
@@ -125,7 +125,7 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
     await login(next);
     await expect(page.getByRole('heading', {name: 'Verify your sign-in'})).toBeVisible();
     await page.getByRole('button', {name: 'Use a passkey', exact: true}).click();
-    await expect(page).toHaveURL(origin + '/account');
+    await expect(page).toHaveURL(origin + '/account/security');
     assert.equal((await db.prepare('SELECT count(*) AS n FROM passkeys').first())!.n, 1);
     await page.getByRole('button', {name: 'Set up authenticator app', exact: true}).click();
     await expect(page.getByRole('heading', {name: 'Set up an authenticator app'})).toBeVisible();
@@ -134,27 +134,27 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
     await expect(page.locator('svg').filter({has: page.locator('path')})).not.toHaveCount(0);
     await page.getByLabel('Six-digit code', {exact: true}).fill(totp(appSecret).generate());
     await page.getByRole('button', {name: 'Confirm authenticator app'}).click();
-    await expect(page).toHaveURL(origin + '/account');
+    await expect(page).toHaveURL(origin + '/account/security');
     await expect(page.getByText('Enabled. Your app generates a new six-digit code every 30 seconds.')).toBeVisible();
     await page.getByRole('button', {name: 'Sign out', exact: true}).click();
     await login(next);
     await page.getByLabel('Six-digit code', {exact: true}).fill(totp(appSecret).generate({timestamp: Date.now() + 30000}));
     await page.getByRole('button', {name: 'Verify authenticator code'}).click();
-    await expect(page).toHaveURL(origin + '/account');
+    await expect(page).toHaveURL(origin + '/account/security');
     assert.equal((await db.prepare('SELECT count(*) AS n FROM totp_credentials').first())!.n, 1);
     // The following independent settings flow starts with fresh rate-limit state.
     await db.prepare('DELETE FROM auth_limits').run();
     await page.getByRole('button', {name: 'Lock security settings'}).click();
     await expect(page.getByRole('heading', {name: 'Unlock security settings'})).toBeVisible();
     await page.getByRole('button', {name: 'Unlock with a passkey'}).click();
-    await expect(page).toHaveURL(origin + '/account');
+    await expect(page).toHaveURL(origin + '/account/security');
     await page.getByRole('button', {name: 'Connect GitHub', exact: true}).click();
     await expect(page.getByRole('heading', {name: 'Confirm account connection'})).toBeVisible();
     await page.getByRole('button', {name: 'Connect GitHub', exact: true}).click();
-    await expect(page).toHaveURL(origin + '/account');
+    await expect(page).toHaveURL(origin + '/account/security');
     await expect(page.getByText('GitHub: Linked GitHub', {exact: true})).toBeVisible();
     await page.getByRole('button', {name: 'Disconnect GitHub', exact: true}).click();
-    await expect(page).toHaveURL(origin + '/account');
+    await expect(page).toHaveURL(origin + '/account/security');
     await expect(page.getByText('GitHub: Not connected', {exact: true})).toBeVisible();
     await page.getByLabel('New email address', {exact: true}).fill('changed@example.com');
     await page.getByRole('button', {name: 'Request email change'}).click();
@@ -169,9 +169,9 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
       await expect(confirmation.getByRole('heading', {name: 'Email address confirmed'})).toBeVisible();
       await confirmation.close();
     }
-    await page.goto(origin + '/account');
+    await page.goto(origin + '/account/security');
     await page.getByRole('button', {name: 'Finish email change'}).click();
-    await expect(page).toHaveURL(origin + '/account');
+    await expect(page).toHaveURL(origin + '/account/security');
     await expect(page.getByText('changed@example.com', {exact: true})).toBeVisible();
     assert.equal((await db.prepare('SELECT count(*) AS n FROM passkeys').first())!.n, 1);
     assert.equal((await db.prepare('SELECT count(*) AS n FROM totp_credentials').first())!.n, 1);
@@ -181,7 +181,51 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
     await login(next, 'changed@example.com');
     await expect(page.getByRole('heading', {name: 'Verify your sign-in'})).toBeVisible();
     await page.getByRole('button', {name: 'Use a passkey', exact: true}).click();
-    await expect(page).toHaveURL(origin + '/account');
+    await expect(page).toHaveURL(origin + '/account/security');
+    // Profile edits are separate from the security grant and work on narrow screens.
+    await page.getByRole('link', {name:'Account settings',exact:true}).click();
+    await expect(page).toHaveURL(origin + '/account/profile');
+    await page.getByLabel('Display name',{exact:true}).fill('Updated Browser User');
+    await page.getByRole('button',{name:'Save display name'}).click();
+    await expect(page.getByLabel('Display name',{exact:true})).toHaveValue('Updated Browser User');
+    await page.getByLabel('Username',{exact:true}).fill('Browser_User');
+    await page.getByRole('button',{name:'Save username'}).click();
+    await expect(page.getByLabel('Username',{exact:true})).toHaveValue('browser_user');
+    await expect(page.getByRole('button',{name:'Save username'})).toBeDisabled();
+    await page.getByRole('link',{name:/View public profile/}).click();
+    await expect(page.getByRole('heading',{name:'Updated Browser User',exact:true})).toBeVisible();
+    await expect(page.getByText('@browser_user',{exact:true})).toBeVisible();
+    await page.goto(origin + '/account/profile');
+    const inputPicture = await page.evaluate(() => {
+      const canvas = document.createElement('canvas'); canvas.width=300; canvas.height=200;
+      canvas.getContext('2d')!.fillRect(0,0,300,200); return canvas.toDataURL('image/png').split(',')[1];
+    });
+    await page.getByLabel('Profile picture',{exact:true}).setInputFiles({name:'picture.png',mimeType:'image/png',buffer:Buffer.from(inputPicture,'base64')});
+    await page.getByRole('button',{name:'Upload picture'}).click();
+    await expect(page.getByRole('img',{name:'Current profile picture'})).toBeVisible();
+    const pictureUrl = await page.getByRole('img',{name:'Current profile picture'}).getAttribute('src');
+    const imageResponse = await context.request.get(pictureUrl!); assert.equal(imageResponse.status(),200);
+    await page.setViewportSize({width:390,height:844});
+    await expect(page.getByRole('navigation',{name:'Account settings'})).toBeVisible();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),false);
+    await page.screenshot({path:'/tmp/blockwork-profile-mobile.png',fullPage:true});
+    await page.getByRole('button',{name:'Remove picture'}).click();
+    assert.equal((await context.request.get(pictureUrl!)).status(),404);
+    await page.getByRole('navigation',{name:'Account settings'}).getByRole('link',{name:'Security',exact:true}).click();
+    await expect(page.getByRole('heading',{name:'Account security',exact:true})).toBeVisible();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),false);
+    const replace = await page.getByRole('button',{name:'Replace authenticator app'}).boundingBox();
+    const remove = await page.getByRole('button',{name:'Remove authenticator app'}).boundingBox();
+    assert.ok(replace && remove && remove.y >= replace.y + replace.height + 8);
+    await page.screenshot({path:'/tmp/blockwork-security-mobile.png',fullPage:true});
+    await page.setViewportSize({width:1280,height:900});
+    const replaceWide=await page.getByRole('button',{name:'Replace authenticator app'}).boundingBox();
+    const removeWide=await page.getByRole('button',{name:'Remove authenticator app'}).boundingBox();
+    assert.ok(replaceWide && removeWide && Math.abs(replaceWide.y-removeWide.y)<1 && removeWide.x >= replaceWide.x+replaceWide.width+8);
+    await page.screenshot({path:'/tmp/blockwork-security-desktop.png',fullPage:true});
+    await page.getByRole('button',{name:'Lock security settings'}).click();
+    await page.getByRole('navigation',{name:'Account settings'}).getByRole('link',{name:'Profile',exact:true}).click();
+    await expect(page.getByLabel('Display name',{exact:true})).toHaveValue('Updated Browser User');
     assert.deepEqual(errors, []);
   } finally {
     await browser?.close();

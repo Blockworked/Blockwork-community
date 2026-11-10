@@ -27,7 +27,7 @@ export const ACCOUNT_JS = String.raw`
       if (!window.PublicKeyCredential || !navigator.credentials) throw new Error('Passkeys require a supported browser and a secure connection.');
       const register = button.dataset.passkey === 'register';
       const label = document.getElementById('passkey-label');
-      const options = await post('/auth/passkey/' + (register ? 'register-options' : 'options'), {label: label ? label.value : '', next: button.dataset.next || '/account'});
+      const options = await post('/auth/passkey/' + (register ? 'register-options' : 'options'), {label: label ? label.value : '', next: button.dataset.next || '/account/security'});
       options.challenge = decode(options.challenge);
       if (options.user) options.user.id = decode(options.user.id);
       for (const key of ['allowCredentials', 'excludeCredentials']) if (options[key]) options[key] = options[key].map(c => ({...c, id: decode(c.id)}));
@@ -56,6 +56,25 @@ export const ACCOUNT_JS = String.raw`
     event.preventDefault();
     try { const result = await post('/auth/backup/verify', {code: new FormData(backup).get('code')}); window.location.assign(result.next); }
     catch (error) { say(error.message); }
+  });
+  const picture = document.getElementById('profile-picture-form');
+  if (picture) picture.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = picture.querySelector('button');
+    button.disabled = true;
+    let bitmap;
+    try {
+      const file = new FormData(picture).get('picture');
+      if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) throw new Error('Choose a PNG, JPEG or WebP picture up to 5 MiB.');
+      bitmap = await createImageBitmap(file);
+      const canvas = document.createElement('canvas'); canvas.width = canvas.height = 256;
+      const size = Math.min(bitmap.width,bitmap.height);
+      canvas.getContext('2d').drawImage(bitmap,(bitmap.width-size)/2,(bitmap.height-size)/2,size,size,0,0,256,256);
+      const png = canvas.toDataURL('image/png').split(',')[1];
+      const result = await post('/account/profile/picture',{png});
+      window.location.assign(result.next);
+    } catch (error) { say(error.message); }
+    finally { if (bitmap) bitmap.close(); button.disabled = false; }
   });
 })();
 `;

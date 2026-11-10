@@ -5,7 +5,7 @@ import { fixture, cookieOf } from './helpers/accounts.ts';
 import { issueSession, securityProof, makeFlow, readFlow } from '../src/account-security.ts';
 import { currentUser, hash } from '../src/auth.ts';
 
-async function owner(f: ReturnType<typeof fixture>, id = 'local:owner', strength = 'primary', next = '/account') {
+async function owner(f: ReturnType<typeof fixture>, id = 'local:owner', strength = 'primary', next = '/account/security') {
   f.sql.prepare("INSERT INTO users (id,name,created_at,public_id) VALUES (?, 'Original Name', 1, lower(hex(randomblob(6))))").run(id);
   return cookieOf(await issueSession(f.env, id, 0, strength, next));
 }
@@ -67,7 +67,7 @@ test('an unlocked settings session survives five minutes, with idle, absolute an
   const other = cookieOf(await issueSession(f.env, user.id, 0, 'primary', '/'));
   assert.equal(await securityProof(new Request(f.env.SITE_URL, {headers: {Cookie: other}}), f.env, user), false);
   f.sql.prepare('UPDATE sessions SET security_last_used_at = ?').run(Date.now() - 1800001);
-  assert.equal((await f.request('/account', undefined, session)).headers.get('Location'), '/account/unlock');
+  assert.equal((await f.request('/account/security', undefined, session)).headers.get('Location'), '/account/unlock');
   f.sql.prepare('UPDATE sessions SET security_last_used_at = ?, security_unlocked_at = ?').run(Date.now(), Date.now() - 3600001);
   assert.equal(await securityProof(new Request(f.env.SITE_URL, {headers: {Cookie: session}}), f.env, user), false);
 });
@@ -89,10 +89,10 @@ test('settings unlock requires a fresh credential proof, same account and browse
   const opened = await f.request(next, undefined, fresh + '; ' + cookie);
   assert.equal(opened.status, 303);
   assert.equal(await currentUser(new Request(f.env.SITE_URL, {headers: {Cookie: session}}), f.env), null);
-  assert.equal((await f.request('/account', undefined, fresh)).status, 200);
+  assert.equal((await f.request('/account/security', undefined, fresh)).status, 200);
   assert.equal((await f.request(next, undefined, fresh + '; ' + cookie)).status, 400);
   assert.equal((await f.request('/account/lock', {}, fresh)).status, 303);
-  assert.equal((await f.request('/account', undefined, fresh)).headers.get('Location'), '/account/unlock');
+  assert.equal((await f.request('/account/security', undefined, fresh)).headers.get('Location'), '/account/unlock');
 });
 
 test('email changes confirm both addresses without scanner activation, preserve MFA and revoke other access', async t => {
@@ -121,7 +121,7 @@ test('email changes confirm both addresses without scanner activation, preserve 
   assert.equal(await currentUser(new Request(f.env.SITE_URL, {headers: {Cookie: session}}), f.env), null);
   assert.equal(await readFlow(f.env, staleReset, 'reset'), null);
   assert.ok(cookieOf(updated));
-  assert.equal((await f.request('/account', undefined, cookieOf(updated))).status, 200);
+  assert.equal((await f.request('/account/security', undefined, cookieOf(updated))).status, 200);
   for (const table of ['passkeys','backup_codes']) assert.equal(f.sql.prepare(`SELECT count(*) n FROM ${table}`).get()!.n, 1);
   assert.equal(mail.length, 4); assert.equal(mail[2].to[0], 'old@example.com'); assert.equal(mail[3].to[0], 'new@example.com');
   assert.equal((await f.request('/account/email-change/finish', {}, cookieOf(updated))).status, 400);

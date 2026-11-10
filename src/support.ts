@@ -84,7 +84,7 @@ function redirect(location: string): Response {
 function shell(env: Env, user: User | null, staff: boolean): Shell {
   const login = link(env, "/login");
   const nav = user
-    ? `<a href="${link(env, "/")}">My tickets</a><a href="${link(env, "/new")}">New ticket</a><a href="${esc(env.SITE_URL)}/account">Account security</a>${staff ? `<a href="${link(env, "/queue")}">Queue</a><a href="${esc(env.SITE_URL)}/staff/accounts">Account recovery</a>` : ""}
+    ? `<a href="${link(env, "/")}">My tickets</a><a href="${link(env, "/new")}">New ticket</a><a href="${esc(env.SITE_URL)}/account">Account settings</a>${staff ? `<a href="${link(env, "/queue")}">Queue</a><a href="${esc(env.SITE_URL)}/staff/accounts">Account recovery</a>` : ""}
        <span class="who">${user.avatar ? `<img class="avatar" src="${esc(user.avatar)}" alt="">` : ""}${esc(user.name)}</span>
        <form class="inline" method="post" action="${link(env, "/logout")}"><button class="ghost">Sign out</button></form>`
     : `<a href="${esc(login)}">Sign in</a>`;

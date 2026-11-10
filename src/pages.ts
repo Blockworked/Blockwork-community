@@ -77,6 +77,21 @@ code, pre { font-family: var(--mono); }
 .subbar nav a:hover { background: var(--hover); color: var(--fg); text-decoration: none; }
 .who { display: inline-flex; align-items: center; gap: 6px; padding: 0 6px 0 10px; font-size: 13px; font-weight: 600; }
 ${SITE_NAV_CSS}
+.settings-layout { display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 24px; margin-top: 24px; }
+.settings-nav { display: flex; flex-direction: column; gap: 6px; align-self: start; position: sticky; top: 16px; }
+.settings-nav a { padding: 10px 14px; border-radius: var(--radius); color: var(--muted); }
+.settings-nav a[aria-current=page] { background: var(--hover); color: var(--fg); font-weight: 700; }
+.settings-content { min-width: 0; }
+.settings-content > h2 { margin-top: 0; }
+.settings-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.settings-actions form { margin: 0; }
+.settings-content .card > form + h3 { margin-top: 24px; }
+.connection-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.connection-row p { margin: 0; }
+.settings-content .card > form + form { margin-top: 12px; }
+.settings-content button { white-space: normal; line-height: 1.3; padding-top: 7px; padding-bottom: 7px; }
+.profile-picture { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; }
+@media (max-width: 640px) { .settings-layout { grid-template-columns: minmax(0,1fr); gap: 16px; } .settings-nav { position: static; flex-direction: row; } }
 /* Home page intro. */
 .hero { margin: -40px 0 28px; padding: 56px 0 40px; border-bottom: 1px solid var(--glass-border); }
 .hero h1 { font-size: clamp(32px, 5vw, 44px); margin-bottom: 8px; }
@@ -149,7 +164,7 @@ export interface Shell {
 
 export function libraryShell(user: User | null, admin: boolean): Shell {
   const nav = user
-    ? `<a href="/submit">Submit a pack</a><a href="/me">My packs</a><a href="/account">Account security</a>${admin ? `<a href="/admin">Review</a>` : ""}
+    ? `<a href="/submit">Submit a pack</a><a href="/me">My packs</a><a href="/account">Account settings</a>${admin ? `<a href="/admin">Review</a>` : ""}
        <span class="who">${user.avatar ? `<img class="avatar" src="${esc(user.avatar)}" alt="">` : ""}${esc(user.name)}</span>
        <form class="inline" method="post" action="/auth/logout"><button class="ghost">Sign out</button></form>`
     : `<a href="/login">Sign in</a>`;
@@ -188,7 +203,7 @@ export function emailLogin(next: string): string {
   return `<div class="card"><h2>Sign in with email</h2><form method="post" action="/auth/email/login">
     <input type="hidden" name="next" value="${esc(next)}">${input('email', 'Email', 'email', 'username')}${input('password', 'Password', 'password', 'current-password')}
     <button class="primary">Sign in</button></form><p><a href="/auth/email/signup">Create an account</a> · <a href="/auth/email/forgot">Forgot password?</a></p></div>
-    <button type="button" data-passkey="login" data-next="${esc(next || '/account')}">Sign in with a passkey</button><p id="auth-status" role="status"></p><script src="/account.js" defer></script>`;
+    <button type="button" data-passkey="login" data-next="${esc(next || '/account/security')}">Sign in with a passkey</button><p id="auth-status" role="status"></p><script src="/account.js" defer></script>`;
 }
 
 export function loginPage(user: User | null, next: string, local = false): Response {

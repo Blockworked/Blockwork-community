@@ -347,9 +347,9 @@ export async function sourcePage(env: Env, user: User | null, admin: boolean, id
 }
 
 export async function authorPage(env: Env, user: User | null, admin: boolean, publicId: string): Promise<Response> {
-  const author = await env.DB.prepare("SELECT id, name, avatar, created_at FROM users WHERE public_id = ? AND banned = 0")
+  const author = await env.DB.prepare("SELECT id, name, avatar, username, created_at FROM users WHERE public_id = ? AND banned = 0")
     .bind(publicId)
-    .first<{ id: string; name: string; avatar: string; created_at: number }>();
+    .first<{ id: string; name: string; avatar: string; username: string | null; created_at: number }>();
   if (!author) return message(user, admin, "Not found", "There's no one here by that name.", 404);
   const { results } = await env.DB.prepare(`${LISTED} AND p.owner_id = ? ORDER BY v.submitted_at DESC`).bind(author.id).all<ListedPack>();
   const official = author.id === OFFICIAL_OWNER;
@@ -359,7 +359,7 @@ export async function authorPage(env: Env, user: User | null, admin: boolean, pu
     user,
     admin,
     `<p class="crumbs"><a href="/">${BACK}All packs</a></p>
-     <div class="profile">${avatar}<div><h1>${esc(author.name)}${official ? verifiedBadge() : ""}</h1>
+     <div class="profile">${avatar}<div><h1>${esc(author.name)}${official ? verifiedBadge() : ""}</h1>${author.username ? `<p class="muted">@${esc(author.username)}</p>` : ""}
      <p class="muted">${official ? "The Blockworked team's official packs." : `Sharing blocks since ${date(author.created_at)}.`} ${plural(results.length, "pack")}.</p></div></div>
      <div class="pack-list">${results.map(listedCard).join("") || `<p class="muted">No packs listed yet.</p>`}</div>`,
   );

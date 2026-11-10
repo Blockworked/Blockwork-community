@@ -105,8 +105,8 @@ test('reset atomically invalidates browsers, apps and pending proofs while retai
   for (const table of ['sessions', 'app_codes', 'auth_flows']) assert.equal(f.sql.prepare(`SELECT count(*) n FROM ${table}`).get()!.n, 0);
   for (const table of ['passkeys', 'backup_codes']) assert.equal(f.sql.prepare(`SELECT count(*) n FROM ${table}`).get()!.n, 1);
   assert.equal(await readFlow(f.env, second, 'second-factor'), null);
-  assert.equal((await finishPrimary(f.env, 'local:test', 0, '/account')).status, 401);
-  const fresh = await finishPrimary(f.env, 'local:test', 1, '/account');
+  assert.equal((await finishPrimary(f.env, 'local:test', 0, '/account/security')).status, 401);
+  const fresh = await finishPrimary(f.env, 'local:test', 1, '/account/security');
   assert.equal(fresh.headers.get('Location'), '/auth/second-factor');
   assert.equal(cookieOf(fresh), '');
 });
@@ -131,7 +131,7 @@ test('real passkey registration, signed authentication, MFA and backup recovery'
   const backup = html.match(/[a-f0-9]{4}(?:-[a-f0-9]{4}){7}/)![0];
   assert.equal(f.sql.prepare('SELECT count(*) n FROM backup_codes').get()!.n, 10);
   assert.ok(!JSON.stringify(f.sql.prepare('SELECT * FROM backup_codes').all()).includes(backup.replace(/-/g, '')));
-  const pending = await finishPrimary(f.env, 'local:test', 1, '/account');
+  const pending = await finishPrimary(f.env, 'local:test', 1, '/account/security');
   assert.equal(pending.headers.get('Location'), '/auth/second-factor');
   const pendingCookie = cookieOf(pending, '__Host-auth-flow');
   // Cancelling a passkey prompt must leave the backup-code flow available.
@@ -141,7 +141,7 @@ test('real passkey registration, signed authentication, MFA and backup recovery'
   assert.equal(recovered.status, 200, await recovered.clone().text());
   assert.ok(cookieOf(recovered));
   assert.equal(f.sql.prepare('SELECT count(*) n FROM backup_codes').get()!.n, 9);
-  const again = await finishPrimary(f.env, 'local:test', 1, '/account');
+  const again = await finishPrimary(f.env, 'local:test', 1, '/account/security');
   assert.equal((await f.request('/auth/backup/verify', {code: backup}, cookieOf(again, '__Host-auth-flow'))).status, 400);
   const options2 = await f.request('/auth/passkey/options', {});
   const assertion = key.assertion((await options2.json()).challenge);
@@ -235,7 +235,7 @@ test('TOTP enrollment requires confirmation; password login accepts fresh codes 
   assert.equal(f.sql.prepare('SELECT count(*) n FROM totp_credentials').get()!.n, 1);
   assert.equal((await f.request('/account/totp/confirm', {code}, cookieOf(confirmed) + '; ' + flow)).status, 400);
   assert.equal((await f.request('/account/totp/delete', {}, cookieOf(confirmed))).status, 400);
-  const pending = await finishPrimary(f.env, 'local:test', 1, '/account');
+  const pending = await finishPrimary(f.env, 'local:test', 1, '/account/security');
   assert.equal(pending.headers.get('Location'), '/auth/second-factor');
   const pendingCookie = cookieOf(pending, '__Host-auth-flow');
   // The enrollment code cannot immediately be reused to sign in.
@@ -247,7 +247,7 @@ test('TOTP enrollment requires confirmation; password login accepts fresh codes 
   assert.equal(verified.status, 200, await verified.clone().text());
   assert.ok(cookieOf(verified));
   assert.equal((await f.request('/auth/totp/verify', {code: nextCode}, pendingCookie)).status, 400);
-  const another = await finishPrimary(f.env, 'local:test', 1, '/account');
+  const another = await finishPrimary(f.env, 'local:test', 1, '/account/security');
   assert.equal((await f.request('/auth/totp/verify', {code: nextCode}, cookieOf(another, '__Host-auth-flow'))).status, 400);
   const backup = await f.request('/account/backup', {}, cookieOf(verified));
   assert.equal(backup.status, 200);
@@ -255,7 +255,7 @@ test('TOTP enrollment requires confirmation; password login accepts fresh codes 
   const reset = await makeFlow(f.env, 'reset', 'local:test', {});
   assert.ok(await replacePassword(f.env, (await readFlow(f.env, reset, 'reset'))!, 'new'));
   assert.equal(f.sql.prepare('SELECT count(*) n FROM totp_credentials').get()!.n, 1);
-  assert.equal((await finishPrimary(f.env, 'local:test', 2, '/account')).headers.get('Location'), '/auth/second-factor');
+  assert.equal((await finishPrimary(f.env, 'local:test', 2, '/account/security')).headers.get('Location'), '/auth/second-factor');
 });
 
 test('support recovery is staff-only, MFA-gated, owner-directed and audited without impersonation', async t => {

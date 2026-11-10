@@ -1,6 +1,7 @@
 // The Blockwork community block library: serves index.json and the pack files
 // Blockwork downloads, and takes reviewed submissions from signed-in accounts.
 
+import { profilePicture } from './profile.ts';
 import { AuthBusyError } from "./account-security.ts";
 import { localAuth } from "./local-auth.ts";
 import { login, callback } from "./oauth.ts";
@@ -80,6 +81,7 @@ export default {
       env.DB.prepare("DELETE FROM auth_limits WHERE expires_at <= ?").bind(Date.now()),
       env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(Date.now()),
       env.DB.prepare("DELETE FROM app_codes WHERE expires_at <= ?").bind(Date.now()),
+      env.DB.prepare("DELETE FROM username_history WHERE hold_until <= ?").bind(Date.now()),
       env.DB.prepare("DELETE FROM email_changes WHERE expires_at <= ? OR auth_version != (SELECT auth_version FROM users WHERE id = email_changes.user_id)").bind(Date.now()),
     ]);
   },
@@ -115,6 +117,8 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
   const url = new URL(req.url);
   const path = url.pathname;
   const method = req.method;
+  const avatar = method === 'GET' ? /^\/avatars\/([a-f0-9-]{36})\.png$/.exec(path) : null;
+  if (avatar) return profilePicture(env, avatar[1]);
   const account = await localAuth(req, env, ctx);
   if (account) return account;
   // The app's API takes bearer tokens, never the cookie, so it can't be forged from another site.
@@ -168,6 +172,10 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
         return new Response(res.body, { status: 400, headers: res.headers });
       });
     }
+  }
+  if (method === 'GET' && (m = path.match(/^\/@([A-Za-z][A-Za-z0-9_]{2,29})$/))) {
+    const author = await env.DB.prepare('SELECT public_id FROM users WHERE username = ? COLLATE NOCASE AND banned = 0').bind(m[1]).first<{public_id:string}>();
+    return author ? authorPage(env,user,admin,author.public_id) : message(user,admin,'Not found', 'There is no profile with that username.',404);
   }
   if (method === "GET" && (m = path.match(/^\/authors\/([a-z0-9]{1,32})$/))) return authorPage(env, user, admin, m[1]);
   if (method === "POST" && (m = path.match(/^\/comments\/(\d+)\/delete$/))) {

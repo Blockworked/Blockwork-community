@@ -17,7 +17,7 @@ function stateCookie(token: string): string {
 }
 const callbackUri = (env: Env, provider: Provider) => `${new URL(env.SITE_URL).origin}/auth/${provider}/callback`;
 function failure(env: Env, text = 'This connection expired or could not be verified. Try again from Account security.', status = 400): Response {
-  const response = accountPage(null, env, 'Account connection', `<p role="alert">${esc(text)}</p><p><a href="/account">Account security</a></p>`, status);
+  const response = accountPage(null, env, 'Account connection', `<p role="alert">${esc(text)}</p><p><a href="/account/security">Account security</a></p>`, status);
   response.headers.append('Set-Cookie', stateCookie(''));
   return response;
 }
@@ -104,7 +104,7 @@ export async function callback(req: Request, env: Env, provider: Provider): Prom
     const token = await makeFlow(env, 'oauth-confirm', user!.id, {provider, subject: profile.subject, label: profile.name, session_hash: proof!.token_hash}, 600, flow.auth_version);
     const response = accountPage(user, env, 'Confirm account connection', `<p>Connect ${esc(PROVIDERS[provider])} account <strong>${esc(profile.name)}</strong> to <strong>${esc(user!.name)}</strong>?</p>
       <p>This lets you sign into this same Blockworked account with ${esc(PROVIDERS[provider])}. Your existing MFA remains required.</p>
-      <form method="post" action="/account/oauth/confirm"><input type="hidden" name="token" value="${esc(token)}"><button>Connect ${esc(PROVIDERS[provider])}</button></form><p><a href="/account">Cancel</a></p>`);
+      <form method="post" action="/account/oauth/confirm"><input type="hidden" name="token" value="${esc(token)}"><button>Connect ${esc(PROVIDERS[provider])}</button></form><p><a href="/account/security">Cancel</a></p>`);
     response.headers.append('Set-Cookie', stateCookie(''));
     return response;
   }
@@ -140,7 +140,7 @@ export async function oauthSettings(req: Request, env: Env, user: User | null, p
   if (!await limit(env, 'oauth-settings', user.id, 15, 3600)) return failure(env, 'Too many connection changes. Try again in an hour.', 429);
   const match = /^\/account\/oauth\/(github|google)\/(connect|disconnect)$/.exec(path);
   if (match?.[2] === 'connect') {
-    const started = await authorize(env, match[1] as Provider, '/account', user, proof);
+    const started = await authorize(env, match[1] as Provider, '/account/security', user, proof);
     const authorization = started.headers.get('Location');
     if (!authorization) return started;
     // Navigate from first-party JS or an explicit link. A form redirect to a
@@ -165,7 +165,7 @@ export async function oauthSettings(req: Request, env: Env, user: User | null, p
       if (!done) return failure(env, 'That provider account is already connected, or the request expired.', 409);
     } catch { return failure(env, 'That provider account could not be connected. Accounts are never merged automatically.', 409); }
     await notify(env, user.id, `${PROVIDERS[data.provider as Provider]} sign-in was connected to your account. Other browsers and apps were signed out.`);
-    return issueSession(env, user.id, proof.auth_version + 1, proof.auth_strength, '/account', proof.security_unlocked_at);
+    return issueSession(env, user.id, proof.auth_version + 1, proof.auth_strength, '/account/security', proof.security_unlocked_at);
   }
   if (match?.[2] === 'disconnect') {
     const provider = match[1] as Provider;
@@ -180,7 +180,7 @@ export async function oauthSettings(req: Request, env: Env, user: User | null, p
     }, [{sql: `DELETE FROM oauth_identities WHERE user_id = ? AND provider = ? AND ${CHANGE_GATE}`, params: [user.id, provider]}], 'oauth_disconnected', provider);
     if (!done) return failure(env, 'Connect another sign-in method before disconnecting this provider. Authenticator codes alone cannot sign you in.', 400);
     await notify(env, user.id, `${PROVIDERS[provider]} sign-in was disconnected. Other browsers and apps were signed out. You can also revoke Blockworked access in your provider account settings.`);
-    return issueSession(env, user.id, proof.auth_version + 1, proof.auth_strength, '/account', proof.security_unlocked_at);
+    return issueSession(env, user.id, proof.auth_version + 1, proof.auth_strength, '/account/security', proof.security_unlocked_at);
   }
   return failure(env, 'Not found', 404);
 }

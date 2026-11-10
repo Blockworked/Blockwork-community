@@ -1,7 +1,7 @@
 import type { Env } from './index.ts';
 import { currentUser, hash, isReservedName, safeNext, PROVIDERS, type User } from './auth.ts';
 import { esc } from './pages.ts';
-import { accountPage as screen } from './account-views.ts';
+import { settingsPage, accountPage as screen } from './account-views.ts';
 import { totpRoute } from './totp.ts';
 import { staffAccounts } from './staff-accounts.ts';
 import { isEmail, normalizeEmail } from './support-mail.ts';
@@ -12,6 +12,7 @@ import { passkeyRoute } from './passkeys.ts';
 import { securityUnlock } from './security-unlock.ts';
 import { emailChange } from './email-change.ts';
 import { oauthSettings } from './oauth.ts';
+import { profileRoute } from './profile.ts';
 import { ACCOUNT_JS } from './account-ui.ts';
 
 const field = (body: Record<string, unknown>, name: string) => typeof body[name] === 'string' ? body[name] as string : '';
@@ -38,28 +39,26 @@ async function settings(req: Request, env: Env, user: User): Promise<Response> {
   const identities = await env.DB.prepare('SELECT provider, label FROM oauth_identities WHERE user_id = ?').bind(user.id).all<{provider: keyof typeof PROVIDERS; label: string}>();
   const activity = await env.DB.prepare('SELECT action,detail,created_at FROM account_security_events WHERE user_id = ? ORDER BY id DESC LIMIT 10').bind(user.id).all<{action: string; detail: string; created_at: number}>();
   const pending = await env.DB.prepare('SELECT new_email,old_confirmed,new_confirmed FROM email_changes WHERE user_id = ? AND expires_at > ? AND auth_version = (SELECT auth_version FROM users WHERE id = ?)').bind(user.id, Date.now(), user.id).first<{new_email: string; old_confirmed: number; new_confirmed: number}>();
-  return screen(user, env, 'Account security', `
+  return settingsPage(user, env, 'Security', `
     <p>Security settings are unlocked for this browser. Settings lock after 30 minutes of inactivity or one hour total.</p><form method="post" action="/account/lock"><button>Lock security settings</button></form>
     <section class="card"><h2>Email and password</h2>${email ? `<p>${esc(email.email)}</p><form method="post" action="/account/password">${input('password', 'New password', 'password', 'new-password')}<button>Change password</button></form>
       <h3>Change linked email</h3><form method="post" action="/account/email-change/start">${input('email', 'New email address', 'email')}<button>Request email change</button></form>
-      <p>Confirm both your current and new email addresses, then finish here. Your current email works until the change is complete.</p>
       ${pending ? `<p>Pending: ${esc(pending.new_email)} · Current address: ${pending.old_confirmed ? 'confirmed' : 'waiting'} · New address: ${pending.new_confirmed ? 'confirmed' : 'waiting'}</p><form method="post" action="/account/email-change/finish"><button ${pending.old_confirmed && pending.new_confirmed ? '' : 'disabled'}>Finish email change</button></form>` : ''}` :
       `<p>Add verified email credentials to this account. This preserves your packs and support tickets.</p><form method="post" action="/account/email">${input('email', 'Email', 'email')}<button>Verify email</button></form>`}
     <p>Use a unique password with at least 15 characters. Password managers and pasting are supported.</p></section>
     <section class="card"><h2>Connected sign-in accounts</h2>
     ${Object.entries(PROVIDERS).map(([provider, name]) => {
       const connected = identities.results.find(i => i.provider === provider);
-      return `<p>${esc(name)}: ${connected ? esc(connected.label) : 'Not connected'}</p><form ${connected ? '' : 'data-oauth-connect'} method="post" action="/account/oauth/${provider}/${connected ? 'disconnect' : 'connect'}"><button>${connected ? 'Disconnect' : 'Connect'} ${esc(name)}</button></form>`;
+      return `<div class="connection-row"><p>${esc(name)}: ${connected ? esc(connected.label) : 'Not connected'}</p><form ${connected ? '' : 'data-oauth-connect'} method="post" action="/account/oauth/${provider}/${connected ? 'disconnect' : 'connect'}"><button>${connected ? 'Disconnect' : 'Connect'} ${esc(name)}</button></form></div>`;
     }).join('')}
-    <p>Connections belong to this account. Connecting or disconnecting signs out other browsers and apps. Keep at least one working sign-in method.</p>
-    <p>To revoke the provider's permission to access your profile, also review connected apps in your Google or GitHub settings.</p></section>
+    </section>
     <section class="card"><h2>Passkeys</h2><p>Use a passkey to sign in directly, or as a second step after your password or Google/GitHub sign-in.</p>
     <ul>${keys.results.map(k => `<li>${esc(k.label)} <form class="inline" method="post" action="/account/passkey/delete"><input type="hidden" name="id" value="${esc(k.id)}"><button>Remove</button></form></li>`).join('') || '<li>No passkeys yet.</li>'}</ul>
     <p><label>Passkey name <input id="passkey-label" type="text" maxlength="80" value="My passkey"></label></p><button type="button" data-passkey="register">Add passkey</button>
     <p>Keep at least one passkey or authenticator app. Add a replacement before removing a lost device.</p></section>
     <section class="card"><h2>Authenticator app</h2><p>${app ? 'Enabled. Your app generates a new six-digit code every 30 seconds.' : 'Use six-digit codes from an authenticator app as a second sign-in step.'}</p>
-    <form method="post" action="/account/totp/setup"><button>${app ? 'Replace authenticator app' : 'Set up authenticator app'}</button></form>
-    ${app ? '<form method="post" action="/account/totp/delete"><button>Remove authenticator app</button></form>' : ''}</section>
+    <div class="settings-actions"><form method="post" action="/account/totp/setup"><button>${app ? 'Replace authenticator app' : 'Set up authenticator app'}</button></form>
+    ${app ? '<form method="post" action="/account/totp/delete"><button>Remove authenticator app</button></form>' : ''}</div></section>
     <section class="card"><h2>Backup codes</h2><p>${codes?.n ?? 0} unused codes. Save these somewhere safe, separate from your device. Each works once after your password or Google/GitHub sign-in.</p>
     <form method="post" action="/account/backup"><button ${keys.results.length || app ? '' : 'disabled'}>Generate new backup codes</button></form><p>Generating codes invalidates all previous codes.</p></section>
     <section class="card"><h2>Signed-in sessions</h2><ul>${sessions.results.map(s => `<li>${s.kind === 'app' ? 'App' : 'Browser'} ${esc(s.label)}${s.created_at ? ` — ${esc(new Date(s.created_at).toISOString().slice(0, 10))}` : ''}</li>`).join('')}</ul>
@@ -82,12 +81,13 @@ export async function localAuth(req: Request, env: Env, ctx?: Pick<ExecutionCont
   if (req.method !== 'GET' && req.method !== 'POST') return new Response('Method not allowed', {status: 405, headers: {Allow: 'GET, POST'}});
   if (req.method === 'POST' && req.headers.get('Origin') !== new URL(env.SITE_URL).origin) return error(env, 'Cross-site request refused.', 403);
   const user = await currentUser(req, env);
+  if (path === '/account' || path === '/account/profile' || path === '/account/profile/picture') return profileRoute(req, env, user);
   if (path.startsWith('/staff/accounts')) return staffAccounts(req, env, user, ctx);
   if (path.startsWith('/account/unlock') || path === '/account/lock') return securityUnlock(req, env, user);
   if (req.method === 'GET' && path.startsWith('/account/email-change/')) return emailChange(req, env, user);
   if (req.method === 'GET') {
-    if (path === '/account') {
-      if (!user) return redirect('/login?next=%2Faccount');
+    if (path === '/account/security') {
+      if (!user) return redirect('/login?next=%2Faccount%2Fsecurity');
       return await securityProof(req, env, user) ? settings(req, env, user) : redirect('/account/unlock');
     }
     if (path === '/auth/email/signup') return screen(user, env, 'Create an account', `<form method="post">${input('name', 'Display name', 'text', 'nickname')}${input('email', 'Email', 'email')}<button class="primary">Verify email</button></form><p>You will set a password after verifying your email.</p>`);
@@ -132,7 +132,7 @@ export async function localAuth(req: Request, env: Env, ctx?: Pick<ExecutionCont
       .bind(email).first<{user_id: string; password_hash: string; auth_version: number; banned: number}>();
     const valid = await passwordMatches(password, row?.password_hash ?? DUMMY_HASH);
     if (!valid || !row || row.banned) return error(env, 'Email or password is incorrect.', 401);
-    return finishPrimary(env, row.user_id, row.auth_version, safeNext(field(body, 'next') || '/account', env));
+    return finishPrimary(env, row.user_id, row.auth_version, safeNext(field(body, 'next') || '/account/security', env));
   }
   if (path === '/auth/email/signup' || path === '/auth/email/forgot' || path === '/account/email') {
     if (!env.SMTP2GO_API_KEY) return error(env, 'Account email is temporarily unavailable.', 503);
@@ -207,7 +207,7 @@ export async function localAuth(req: Request, env: Env, ctx?: Pick<ExecutionCont
       ]);
       if (results[1].meta.changes !== 1) return error(env);
       await notify(env, user.id, 'New Blockworked backup codes were generated. All previous backup codes are invalid.');
-      return screen(user, env, 'Save your backup codes', `<p>These codes are shown once. Save them in a secure place. Each works once with your password or Google/GitHub sign-in.</p><pre>${codes.map(code => code.match(/.{4}/g)!.join('-')).join('\n')}</pre><p><a href="/account">I saved my codes</a></p>`);
+      return screen(user, env, 'Save your backup codes', `<p>These codes are shown once. Save them in a secure place. Each works once with your password or Google/GitHub sign-in.</p><pre>${codes.map(code => code.match(/.{4}/g)!.join('-')).join('\n')}</pre><p><a href="/account/security">I saved my codes</a></p>`);
     }
     if (path === '/account/passkey/delete') {
       const count = await env.DB.prepare('SELECT count(*) AS n FROM passkeys WHERE user_id = ?').bind(user.id).first<{n: number}>();
@@ -227,7 +227,7 @@ export async function localAuth(req: Request, env: Env, ctx?: Pick<ExecutionCont
       ]);
       if (results[0].meta.changes !== 1) return error(env);
       await notify(env, user.id, 'A passkey was removed from your Blockworked account. All browsers and apps have been signed out.');
-      return redirect('/login?next=%2Faccount');
+      return redirect('/login?next=%2Faccount%2Fsecurity');
     }
     if (path === '/account/revoke') {
       const results = await env.DB.batch([

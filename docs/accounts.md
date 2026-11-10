@@ -214,3 +214,30 @@ provider connection confirmation and linked-email changes.
 Outbound email and breach queries are simulated locally. Install Chromium with
 `npx playwright install chromium` or point `CHROMIUM_PATH` to an existing binary.
 The test uses only local ephemeral storage and never sends real email.
+
+## Profile and settings navigation
+
+The single **Account settings** navigation entry opens `/account/profile`.
+A responsive sidebar switches between Profile and Security (`/account/security`).
+Profile edits require a live browser session and exact-Origin POSTs; only the
+Security page requires the existing settings unlock. Display names remain
+non-unique and can be edited independently of credentials. Provider sign-ins
+never overwrite profile edits.
+
+Usernames are optional public handles, separate from email sign-in. They use
+3–30 ASCII letters, digits or underscores, begin with a letter, and normalize
+to lowercase. A unique database index arbitrates concurrent claims. Team and
+staff names are reserved. A successful first claim or change starts a 30-day
+cooldown stored on the user; failed attempts do not start it. Released handles
+remain reserved to the same owner for 90 days to limit impersonation. Handles
+appear on public author pages and in the app profile API; `/@username` resolves
+the current owner while existing stable author URLs and account IDs remain valid.
+Existing users select their own handle rather than inheriting provider names.
+
+Profile edits are limited to 20 requests per account per hour, pictures to 10.
+The browser center-crops and re-encodes PNG/JPEG/WebP uploads (up to 5 MiB) into
+a 256-pixel static PNG. The server checks chunk structure/checksums, dimensions,
+and a bounded decompressed raster; it rejects animation and strips metadata.
+Only the current picture is stored in D1. Replacement/removal invalidates its
+previous URL and image responses use no-store. Migration `0015_profiles.sql`
+is additive and leaves credentials, ownership and sessions intact.

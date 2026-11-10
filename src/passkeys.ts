@@ -36,7 +36,7 @@ export async function passkeyRoute(req: Request, env: Env, path: string, body: R
     const options = await generateAuthenticationOptions({rpID, userVerification: 'required',
       ...(keys ? {allowCredentials: keys.results.map(k => ({id: k.id, transports: JSON.parse(k.transports)}))} : {})});
     const token = await makeFlow(env, 'passkey-login', second?.user_id ?? null,
-      {challenge: options.challenge, parent: second ? flowToken(req) : null, next: second ? JSON.parse(second.data).next : safeNext(String(body.next ?? '/account'), env)});
+      {challenge: options.challenge, parent: second ? flowToken(req) : null, next: second ? JSON.parse(second.data).next : safeNext(String(body.next ?? '/account/security'), env)});
     return json(options, 200, token);
   }
   if (path === '/auth/passkey/verify') {
@@ -94,7 +94,7 @@ export async function passkeyRoute(req: Request, env: Env, path: string, body: R
       ]);
       if (results[0].meta.changes !== 1) return fail();
       await notify(env, user.id, 'A passkey was added to your Blockworked account. Other browsers and apps have been signed out. Save backup codes in Account security.');
-      return complete(env, {...flow, auth_version: flow.auth_version + 1}, user.id, 'strong', '/account?enrolled=1', proof.security_unlocked_at);
+      return complete(env, {...flow, auth_version: flow.auth_version + 1}, user.id, 'strong', '/account/security?enrolled=1', proof.security_unlocked_at);
     } catch { return fail(); }
   }
   if (path === '/auth/backup/verify') {
