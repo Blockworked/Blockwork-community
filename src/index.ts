@@ -1,6 +1,8 @@
 // The Blockwork community block library: serves index.json and the pack files
 // Blockwork downloads, and takes reviewed submissions from signed-in accounts.
 
+import { AuthBusyError } from "./account-security.ts";
+import { localAuth } from "./local-auth.ts";
 import { callback, currentUser, shareSession, isAdmin, login, logout, PROVIDERS, type Provider, type User } from "./auth.ts";
 import { esc, loginPage, message, page } from "./pages.ts";
 import { authorPage, home, packCard, packPage, published, sourcePage, withBlockViews, type VersionRow } from "./browse.ts";
@@ -17,6 +19,11 @@ import { reviewDecision, reviewFile, reviewPage, reviewQueue, setBanned, setList
 
 export interface Env {
   DB: D1Database;
+  /** Enable only after migration, verified mail sender and adequate Workers CPU are configured. */
+  LOCAL_AUTH_ENABLED?: string;
+  AUTH_FROM?: string;
+  /** 32 random bytes encoded as unpadded base64url. A Worker secret, never a variable. */
+  AUTH_TOTP_KEY?: string;
   PACKS: R2Bucket;
   SITE_URL: string;
   /** blockworked.com, which the shared top nav links to. */
@@ -66,28 +73,48 @@ export default {
     await receiveEmail(message, env);
   },
 
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async scheduled(_event: ScheduledEvent, env: Env): Promise<void> {
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM auth_flows WHERE expires_at <= ?").bind(Date.now()),
+      env.DB.prepare("DELETE FROM auth_limits WHERE expires_at <= ?").bind(Date.now()),
+      env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(Date.now()),
+      env.DB.prepare("DELETE FROM app_codes WHERE expires_at <= ?").bind(Date.now()),
+    ]);
+  },
+
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     setMainSite(env.MAIN_SITE_URL, supportUrl(env));
     let res: Response;
     try {
-      res = await route(req, env);
+      res = await route(req, env, ctx);
     } catch (e) {
-      console.error(e);
-      res = message(null, false, "Something went wrong", "Try again in a moment.", 500);
+      if (e instanceof AuthBusyError) res = message(null, false, "Sign-in is busy", "Try again shortly.", 503);
+      else {
+        // Authentication requests can contain bearer secrets. Never log their URLs or bodies.
+        console.error("Request failed");
+        res = message(null, false, "Something went wrong", "Try again in a moment.", 500);
+      }
     }
     const headers = new Headers(res.headers);
     const loopbackForm = headers.has("X-Loopback-Form");
     headers.delete("X-Loopback-Form");
     for (const [k, v] of Object.entries(securityHeaders(env, loopbackForm))) headers.set(k, v);
     if (!headers.has("Set-Cookie")) shareSession(req, env, headers);
+    if (new URL(req.url).pathname.startsWith("/auth/") || new URL(req.url).pathname.startsWith("/account") || new URL(req.url).pathname.startsWith("/staff/accounts") || new URL(req.url).pathname === "/login") {
+      headers.set("Cache-Control", "no-store");
+      headers.set("Referrer-Policy", "strict-origin");
+    }
+    if (new URL(req.url).protocol === "https:") headers.set("Strict-Transport-Security", "max-age=31536000");
     return new Response(res.body, { status: res.status, headers });
   },
 };
 
-async function route(req: Request, env: Env): Promise<Response> {
+async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(req.url);
   const path = url.pathname;
   const method = req.method;
+  const account = await localAuth(req, env, ctx);
+  if (account) return account;
   // The app's API takes bearer tokens, never the cookie, so it can't be forged from another site.
   if (path.startsWith("/api/")) return api(req, env, path);
   // Forms only come from this site, or the helpdesk's own pages.
@@ -149,8 +176,8 @@ async function route(req: Request, env: Env): Promise<Response> {
     if (method === "GET") return appLoginPage(user, url);
     if (method === "POST") return appLoginConfirm(req, env, user);
   }
-  if (method === "GET" && path === "/login") return loginPage(user, url.searchParams.get("next") ?? "");
-  if ((m = path.match(/^\/auth\/(\w+)\/(login|callback)$/)) && m[1] in PROVIDERS && method === "GET") {
+  if (method === "GET" && path === "/login") return loginPage(user, url.searchParams.get("next") ?? "", env.LOCAL_AUTH_ENABLED === "true");
+  if ((m = path.match(/^\/auth\/(\w+)\/(login|callback)$/)) && Object.hasOwn(PROVIDERS, m[1]) && method === "GET") {
     const provider = m[1] as Provider;
     return m[2] === "login" ? login(env, provider, url.searchParams.get("next")) : callback(req, env, provider);
   }

@@ -84,7 +84,7 @@ function redirect(location: string): Response {
 function shell(env: Env, user: User | null, staff: boolean): Shell {
   const login = link(env, "/login");
   const nav = user
-    ? `<a href="${link(env, "/")}">My tickets</a><a href="${link(env, "/new")}">New ticket</a>${staff ? `<a href="${link(env, "/queue")}">Queue</a>` : ""}
+    ? `<a href="${link(env, "/")}">My tickets</a><a href="${link(env, "/new")}">New ticket</a><a href="${esc(env.SITE_URL)}/account">Account security</a>${staff ? `<a href="${link(env, "/queue")}">Queue</a><a href="${esc(env.SITE_URL)}/staff/accounts">Account recovery</a>` : ""}
        <span class="who">${user.avatar ? `<img class="avatar" src="${esc(user.avatar)}" alt="">` : ""}${esc(user.name)}</span>
        <form class="inline" method="post" action="${link(env, "/logout")}"><button class="ghost">Sign out</button></form>`
     : `<a href="${esc(login)}">Sign in</a>`;
@@ -154,7 +154,7 @@ function loginPage(env: Env, user: User | null, staff: boolean, next: string): R
     null,
     false,
     `<h1>Sign in</h1><p class="muted">Use your Blockwork community account, or make one by signing in. You can also email
-     <a href="mailto:${esc(fromAddress(env))}">${esc(fromAddress(env))}</a> without an account.</p><div class="signin">${buttons}</div>`,
+     <a href="mailto:${esc(fromAddress(env))}">${esc(fromAddress(env))}</a> without an account.</p><div class="signin">${buttons}${env.LOCAL_AUTH_ENABLED === "true" ? `<a class="button large" href="${esc(`${env.SITE_URL}/login?next=${back}`)}">Sign in with email or a passkey</a>` : ""}</div>`,
     200,
     shell(env, null, false),
   );
