@@ -8,7 +8,7 @@ export async function accountMail(env: Env, email: string, subject: string, text
     const res = await fetch('https://api.smtp2go.com/v3/email/send', {
       method: 'POST', signal: AbortSignal.timeout(10000),
       headers: { 'Content-Type': 'application/json', 'X-Smtp2go-Api-Key': env.SMTP2GO_API_KEY },
-      body: JSON.stringify({ sender: `Blockworked Accounts <${env.AUTH_FROM || env.SUPPORT_FROM || 'support@blockworked.com'}>`,
+      body: JSON.stringify({ sender: `Blockworked Accounts <${env.AUTH_FROM || 'noreply@blockworked.com'}>`,
         to: [email], subject, text_body: text, custom_headers: [{header: 'Auto-Submitted', value: 'auto-generated'}] }),
     });
     if (!res.ok) return false;

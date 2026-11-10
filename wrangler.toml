@@ -12,7 +12,7 @@ routes = [
 [vars]
 # Enable after following docs/accounts.md; this requires migrations 0012/0013 even when disabled.
 LOCAL_AUTH_ENABLED = "true"
-AUTH_FROM = "support@blockworked.com"
+AUTH_FROM = "noreply@blockworked.com"
 # The address the site is served at; OAuth callbacks go to <SITE_URL>/auth/<provider>/callback.
 SITE_URL = "https://community.blockworked.com"
 # The main site, which the top nav shared with it links to (src/site-nav.ts).

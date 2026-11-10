@@ -117,7 +117,7 @@ proofs, rate-limit buckets, sessions and app codes.
    lower scrypt parameters to fit the free plan. D1 rate limits are application
    protection; use Cloudflare edge rate limits/WAF for distributed abuse before
    requests reach hashing or D1.
-3. Configure a verified SMTP2GO sender in `AUTH_FROM` and the existing
+3. Configure a verified SMTP2GO sender in `AUTH_FROM` (default: `noreply@blockworked.com`) and the existing
    `SMTP2GO_API_KEY` secret. Use `wrangler secret put SMTP2GO_API_KEY`, never chat
    or source control for the value. Configure SPF, DKIM and DMARC for the sender
    domain and test real delivery. Allow outbound HTTPS to `api.smtp2go.com` and
