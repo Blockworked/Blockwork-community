@@ -70,11 +70,11 @@ export function redirect(path: string, flow?: string): Response {
   if (flow !== undefined) headers.append('Set-Cookie', flowCookie(flow, flow ? 600 : 0));
   return new Response(null, { status: 303, headers });
 }
-export async function issueSession(env: Env, id: string, authVersion: number, strength: string, next = '/account', unlockedAt?: number): Promise<Response> {
+export async function issueSession(env: Env, id: string, authVersion: number, strength: string, next = '/account/security', unlockedAt?: number): Promise<Response> {
   const token = randomToken();
   const now = Date.now();
   const target = new URL(safeNext(next, env), env.SITE_URL);
-  let unlock = target.origin === new URL(env.SITE_URL).origin && target.pathname === '/account' ? (unlockedAt ?? now) : 0;
+  let unlock = target.origin === new URL(env.SITE_URL).origin && target.pathname === '/account/security' ? (unlockedAt ?? now) : 0;
   if (target.pathname === '/account/unlock/complete') {
     const intent = await readFlow(env, target.searchParams.get('token') ?? '', 'settings-unlock');
     if (!intent || intent.user_id !== id || intent.auth_version !== authVersion) return new Response('Use a sign-in method belonging to this account.', {status: 403});
@@ -132,7 +132,7 @@ export async function limit(env: Env, scope: string, identity: string, max: numb
     .bind(key, now + seconds * 1000, now, now).first<{count: number}>();
   return !!row && row.count <= max;
 }
-export async function boundedBody(req: Request): Promise<Record<string, unknown>> {
+export async function boundedBody(req: Request, maxBytes = 20000): Promise<Record<string, unknown>> {
   const reader = req.body?.getReader();
   if (!reader) return {};
   let size = 0;
@@ -141,7 +141,7 @@ export async function boundedBody(req: Request): Promise<Record<string, unknown>
     const {done, value} = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > 20000) { await reader.cancel(); throw new Error('Request too large'); }
+    if (size > maxBytes) { await reader.cancel(); throw new Error('Request too large'); }
     chunks.push(value);
   }
   const bytes = new Uint8Array(size);

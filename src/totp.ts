@@ -104,7 +104,7 @@ export async function totpRoute(req: Request, env: Env, path: string, body: Reco
     ]);
     if (results[0].meta.changes !== 1) return fail();
     await notify(env, user.id, 'An authenticator app was enabled or replaced on your Blockworked account. Other browsers and apps have been signed out. Save backup codes in Account security.');
-    return issueSession(env, user.id, flow.auth_version + 1, 'totp', '/account', proof.security_unlocked_at);
+    return issueSession(env, user.id, flow.auth_version + 1, 'totp', '/account/security', proof.security_unlocked_at);
   }
   if (path === '/account/totp/delete') {
     if (!await env.DB.prepare('SELECT 1 FROM passkeys WHERE user_id = ?').bind(user.id).first()) return fail('Add a passkey before removing your last authenticator app. You can replace the app by setting up a new one.');
@@ -123,7 +123,7 @@ export async function totpRoute(req: Request, env: Env, path: string, body: Reco
     ]);
     if (results[0].meta.changes !== 1) return fail();
     await notify(env, user.id, 'An authenticator app was removed from your Blockworked account. All browsers and apps have been signed out.');
-    return new Response(null, {status: 303, headers: {Location: '/login?next=%2Faccount'}});
+    return new Response(null, {status: 303, headers: {Location: '/login?next=%2Faccount%2Fsecurity'}});
   }
   return json({error: 'Not found'}, 404);
 }

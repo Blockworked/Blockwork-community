@@ -118,9 +118,10 @@ async function body(req: Request): Promise<Record<string, unknown>> {
 }
 
 async function profile(env: Env, user: User) {
-  const row = await env.DB.prepare("SELECT public_id FROM users WHERE id = ?").bind(user.id).first<{ public_id: string | null }>();
+  const row = await env.DB.prepare("SELECT public_id, username FROM users WHERE id = ?").bind(user.id).first<{ public_id: string | null; username: string | null }>();
   return {
     name: user.name,
+    username: row?.username ?? null,
     avatar: user.avatar,
     id: row?.public_id ?? "",
     page: row?.public_id ? `${env.SITE_URL}/authors/${row.public_id}` : "",

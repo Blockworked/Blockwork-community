@@ -11,7 +11,7 @@ interface Change { id: string; user_id: string; auth_version: number; old_email:
 const validChange = `SELECT c.* FROM email_changes c JOIN users u ON u.id = c.user_id JOIN email_credentials e ON e.user_id = c.user_id
   WHERE c.expires_at > ? AND c.auth_version = u.auth_version AND u.banned = 0 AND e.email = c.old_email`;
 function result(env: Env, user: User | null, title: string, text: string, status = 200): Response {
-  return accountPage(user, env, title, `<p>${esc(text)}</p><p><a href="/account">Account security</a></p>`, status);
+  return accountPage(user, env, title, `<p>${esc(text)}</p><p><a href="/account/security">Account security</a></p>`, status);
 }
 export async function emailChange(req: Request, env: Env, user: User | null, body: Record<string, unknown> = {}): Promise<Response> {
   const url = new URL(req.url), path = url.pathname;
@@ -90,7 +90,7 @@ export async function emailChange(req: Request, env: Env, user: User | null, bod
     const text = 'Your Blockworked account email was changed. Other browsers, apps and pending recovery links were signed out or invalidated. Your password, passkeys, authenticator app and backup codes are unchanged. If this was not you, contact support immediately.';
     const notices = await Promise.all([change.old_email, change.new_email].map(to => accountMail(env, to, 'Blockworked email changed', text)));
     if (notices.some(v => !v)) console.error('Email change security notice delivery failed');
-    return issueSession(env, user.id, proof.auth_version + 1, proof.auth_strength, '/account', proof.security_unlocked_at);
+    return issueSession(env, user.id, proof.auth_version + 1, proof.auth_strength, '/account/security', proof.security_unlocked_at);
   }
   return result(env, user, 'Not found', 'There is nothing here.', 404);
 }

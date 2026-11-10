@@ -19,7 +19,7 @@ function view(env: Env, user: User, html: string, status = 200): Response {
 export async function staffAccounts(req: Request, env: Env, user: User | null, ctx?: Pick<ExecutionContext, 'waitUntil'>): Promise<Response> {
   if (!user || !isStaff(env, user)) return new Response('Not found', {status: 404});
   if (!await securityProof(req, env, user, true)) return view(env, user,
-    '<p>Support recovery requires MFA and an unlocked security-settings session. Enroll MFA in Account security, then unlock settings to continue.</p><p><a href="/account">Account security</a> · <a href="/account/unlock?next=%2Fstaff%2Faccounts">Unlock settings</a></p>', 403);
+    '<p>Support recovery requires MFA and an unlocked security-settings session. Enroll MFA in Account security, then unlock settings to continue.</p><p><a href="/account/security">Account security</a> · <a href="/account/unlock?next=%2Fstaff%2Faccounts">Unlock settings</a></p>', 403);
   const path = new URL(req.url).pathname;
   if (req.method === 'GET' && path === '/staff/accounts') return view(env, user, `<p>Find an account in connection with a support ticket. Actions are audited. Recovery emails go only to the account's existing verified address.</p>
     <form method="post" action="/staff/accounts/lookup"><p><label>Ticket number <input type="text" inputmode="numeric" name="ticket" pattern="[0-9]+" required></label></p>
