@@ -20,7 +20,7 @@ ADMINS = "github:39657565"
 # The helpdesk. support@ mail reaches the Worker through an Email Routing rule.
 SUPPORT_URL = "https://support.blockworked.com"
 SUPPORT_FROM = "support@blockworked.com"
-# Told about new tickets and replies, comma-separated.
+# Told about pack submissions, new tickets and requester replies, comma-separated.
 SUPPORT_NOTIFY = "ethan@blockworked.com"
 # Account ids who answer tickets besides ADMINS, comma-separated.
 SUPPORT_STAFF = ""
@@ -38,4 +38,7 @@ bucket_name = "blockwork-library"
 
 # Secrets (wrangler secret put, or .dev.vars locally):
 # GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
-# SMTP2GO_API_KEY (ticket email; without it mail is only logged)
+# SMTP2GO_API_KEY (email; without it mail is only logged)
+# NTFY_TOPIC (private topic), NTFY_TOKEN (optional access token),
+# DISCORD_WEBHOOK_URL (channel webhook URL)
+# Set NTFY_URL as a var for a self-hosted server; defaults to https://ntfy.sh.

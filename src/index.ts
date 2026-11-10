@@ -34,6 +34,11 @@ export interface Env {
   SUPPORT_FROM?: string;
   /** Comma-separated addresses told about new tickets and replies. */
   SUPPORT_NOTIFY?: string;
+  /** Optional staff push channels; topic and webhook URL are secrets. */
+  NTFY_URL?: string;
+  NTFY_TOPIC?: string;
+  NTFY_TOKEN?: string;
+  DISCORD_WEBHOOK_URL?: string;
   /** Comma-separated account ids who answer tickets, besides ADMINS. */
   SUPPORT_STAFF?: string;
   /** Set to blockworked.com so a sign-in here also signs in on the helpdesk. */

@@ -1,3 +1,4 @@
+import { validateImages, type ImageAttachment } from "./support-attachments.ts";
 // Mail sent to support@: Cloudflare Email Routing hands each message to
 // receiveEmail, which files it as a reply to its ticket or as a new ticket.
 
@@ -16,7 +17,7 @@ import {
 } from "./support-mail.ts";
 
 // Cloudflare hands over at most 25 MiB; a support mail never needs that.
-const MAX_RAW_EMAIL = 5 * 1024 * 1024;
+const MAX_RAW_EMAIL = 10 * 1024 * 1024;
 
 interface InboundEmail {
   from: string;
@@ -29,7 +30,7 @@ interface InboundEmail {
 /** A message Cloudflare Email Routing delivered to support@: a reply to a ticket, or a new one. */
 export async function receiveEmail(message: InboundEmail, env: Env): Promise<void> {
   if (message.rawSize > MAX_RAW_EMAIL) {
-    message.setReject("Message too large; please send it without attachments.");
+    message.setReject("Message too large; maximum email size is 10 MiB.");
     return;
   }
   if (isAutomated((name) => message.headers.get(name))) return;
@@ -41,13 +42,19 @@ export async function receiveEmail(message: InboundEmail, env: Env): Promise<voi
   // A resent message (a retry, or the same mail to two of our addresses) lands once.
   if (emailId && (await env.DB.prepare("SELECT 1 FROM ticket_messages WHERE email_id = ?").bind(emailId).first())) return;
   const text = parsed.text?.trim() ? parsed.text : htmlToText(parsed.html ?? "");
-  const attachments = parsed.attachments?.length ?? 0;
-  const note = attachments ? `\n\n(${attachments} attachment${attachments === 1 ? "" : "s"} not kept; ask them to link it instead.)` : "";
+  const images: ImageAttachment[] = [];
+  let skipped = 0;
+  for (const attachment of parsed.attachments ?? []) {
+    if (!["image/png", "image/jpeg", "image/gif", "image/webp"].includes(attachment.mimeType)) { skipped++; continue; }
+    images.push({ name: attachment.filename || "image", type: attachment.mimeType, bytes: new Uint8Array(attachment.content as ArrayBuffer) });
+  }
+  try { validateImages(images); } catch (error) { message.setReject((error as Error).message); return; }
+  const note = skipped ? `\n\n(${skipped} non-image attachment(s) not kept. Send PNG, JPEG, GIF or WebP images.)` : "";
 
   const ticket = await findTicket(env, from, parsed.inReplyTo ?? "", parsed.references ?? "", parsed.subject ?? "");
   if (ticket) {
     const body = tidy(stripQuoted(text)) || "(empty reply)";
-    await addMessage(env, ticket, "requester", null, body + note, emailId);
+    await addMessage(env, ticket, "requester", null, body + note, emailId, images);
     return;
   }
   const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM tickets WHERE email = ? AND created_at > ?")
@@ -55,7 +62,7 @@ export async function receiveEmail(message: InboundEmail, env: Env): Promise<voi
     .first<{ n: number }>();
   if ((recent?.n ?? 0) >= NEW_TICKETS_PER_HOUR) return;
   const body = tidy(text) || "(empty message)";
-  await openTicket(env, { subject: cleanSubject(parsed.subject ?? ""), body: body + note, email: from, name, userId: null, emailId });
+  await openTicket(env, { subject: cleanSubject(parsed.subject ?? ""), body: body + note, email: from, name, userId: null, emailId, images });
 }
 
 /** The ticket an email answers: by the ids it replies to, else the [#n] in its subject. Only the requester's own address counts. */
