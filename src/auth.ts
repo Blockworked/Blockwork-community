@@ -1,7 +1,6 @@
 // Provider sign-in and shared cookie sessions backed by D1.
 
 import type { Env } from "./index.ts";
-import { finishPrimary, version } from "./account-security.ts";
 
 export interface User {
   id: string;
@@ -101,104 +100,6 @@ export function safeNext(next: string | null, env?: Pick<Env, "SUPPORT_URL">): s
     } catch {}
   }
   return "/";
-}
-
-function redirectUri(env: Env, provider: Provider): string {
-  return `${env.SITE_URL}/auth/${provider}/callback`;
-}
-
-export function login(env: Env, provider: Provider, next: string | null): Response {
-  const state = randomToken();
-  const url =
-    provider === "github"
-      ? new URL("https://github.com/login/oauth/authorize")
-      : new URL("https://accounts.google.com/o/oauth2/v2/auth");
-  url.searchParams.set("client_id", provider === "github" ? env.GITHUB_CLIENT_ID : env.GOOGLE_CLIENT_ID);
-  url.searchParams.set("redirect_uri", redirectUri(env, provider));
-  url.searchParams.set("state", state);
-  if (provider === "github") {
-    url.searchParams.set("scope", "read:user");
-    url.searchParams.set("allow_signup", "true");
-  } else {
-    url.searchParams.set("response_type", "code");
-    url.searchParams.set("scope", "openid profile");
-  }
-  const headers = new Headers({ Location: url.toString() });
-  headers.append("Set-Cookie", setCookie("oauth", `${state}.${encodeURIComponent(safeNext(next, env))}`, 600, "/auth"));
-  return new Response(null, { status: 302, headers });
-}
-
-async function fetchProfile(env: Env, provider: Provider, code: string): Promise<{ id: string; name: string; avatar: string }> {
-  if (provider === "github") {
-    const token = await fetch("https://github.com/login/oauth/access_token", {
-      method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_id: env.GITHUB_CLIENT_ID,
-        client_secret: env.GITHUB_CLIENT_SECRET,
-        code,
-        redirect_uri: redirectUri(env, provider),
-      }),
-    }).then((r) => r.json<{ access_token?: string }>());
-    if (!token.access_token) throw new Error("GitHub didn't sign you in");
-    const me = await fetch("https://api.github.com/user", {
-      headers: { Authorization: `Bearer ${token.access_token}`, "User-Agent": "blockwork-library", Accept: "application/json" },
-    }).then((r) => r.json<{ id: number; login: string; name?: string; avatar_url?: string }>());
-    if (!me.id) throw new Error("GitHub didn't sign you in");
-    return { id: `github:${me.id}`, name: me.name || me.login, avatar: me.avatar_url ?? "" };
-  }
-  const token = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: env.GOOGLE_CLIENT_ID,
-      client_secret: env.GOOGLE_CLIENT_SECRET,
-      code,
-      grant_type: "authorization_code",
-      redirect_uri: redirectUri(env, provider),
-    }),
-  }).then((r) => r.json<{ access_token?: string }>());
-  if (!token.access_token) throw new Error("Google didn't sign you in");
-  const me = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
-    headers: { Authorization: `Bearer ${token.access_token}` },
-  }).then((r) => r.json<{ sub?: string; name?: string; picture?: string }>());
-  if (!me.sub) throw new Error("Google didn't sign you in");
-  return { id: `google:${me.sub}`, name: me.name || "Google user", avatar: me.picture ?? "" };
-}
-
-export async function callback(req: Request, env: Env, provider: Provider): Promise<Response> {
-  const url = new URL(req.url);
-  const saved = cookie(req, "oauth") ?? "";
-  const dot = saved.indexOf(".");
-  const state = dot > 0 ? saved.slice(0, dot) : "";
-  const next = saved.slice(dot + 1);
-  const code = url.searchParams.get("code");
-  if (!state || !code || url.searchParams.get("state") !== state) {
-    return new Response("Sign-in expired. Go back and try again.", { status: 400 });
-  }
-  const profile = await fetchProfile(env, provider, code);
-  // Admins are exempt so a reviewer can't lock themselves out.
-  if (isReservedName(profile.name) && !isAdmin(env, { id: profile.id, name: profile.name, avatar: "", banned: 0 })) {
-    const where = provider === "github" ? "GitHub profile" : "Google account";
-    return new Response(
-      `"${profile.name}" is reserved for the Blockworked team. Change the name on your ${where} and sign in again.`,
-      { status: 403, headers: { "Content-Type": "text/plain; charset=utf-8" } },
-    );
-  }
-  const now = Date.now();
-  // Name and avatar follow the provider; banned stays as it was.
-  await env.DB.prepare(
-    // public_id names the account in author page links, so provider ids stay private.
-    `INSERT INTO users (id, name, avatar, created_at, public_id) VALUES (?, ?, ?, ?, lower(hex(randomblob(6))))
-     ON CONFLICT(id) DO UPDATE SET name = excluded.name, avatar = excluded.avatar`,
-  )
-    .bind(profile.id, profile.name.slice(0, 80), profile.avatar, now)
-    .run();
-  let target = "/";
-  try { target = safeNext(decodeURIComponent(next), env); } catch {}
-  const response = await finishPrimary(env, profile.id, await version(env, profile.id), target);
-  response.headers.append("Set-Cookie", setCookie("oauth", "", 0, "/auth"));
-  return response;
 }
 
 /**

@@ -49,10 +49,10 @@ export interface Flow { token_hash: string; purpose: string; user_id: string | n
 export async function version(env: Env, id: string): Promise<number> {
   return (await env.DB.prepare('SELECT auth_version FROM users WHERE id = ? AND banned = 0').bind(id).first<{auth_version: number}>())?.auth_version ?? -1;
 }
-export async function makeFlow(env: Env, purpose: string, id: string | null, data: object, seconds = 600): Promise<string> {
+export async function makeFlow(env: Env, purpose: string, id: string | null, data: object, seconds = 600, expectedVersion?: number): Promise<string> {
   const token = randomToken();
   await env.DB.prepare('INSERT INTO auth_flows (token_hash, purpose, user_id, auth_version, data, expires_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .bind(await hash(token), purpose, id, id ? await version(env, id) : 0, JSON.stringify(data), Date.now() + seconds * 1000).run();
+    .bind(await hash(token), purpose, id, id ? (expectedVersion ?? await version(env, id)) : 0, JSON.stringify(data), Date.now() + seconds * 1000).run();
   return token;
 }
 export async function readFlow(env: Env, token: string, purpose: string, consume = false): Promise<Flow | null> {
@@ -70,12 +70,20 @@ export function redirect(path: string, flow?: string): Response {
   if (flow !== undefined) headers.append('Set-Cookie', flowCookie(flow, flow ? 600 : 0));
   return new Response(null, { status: 303, headers });
 }
-export async function issueSession(env: Env, id: string, authVersion: number, strength: string, next = '/account'): Promise<Response> {
+export async function issueSession(env: Env, id: string, authVersion: number, strength: string, next = '/account', unlockedAt?: number): Promise<Response> {
   const token = randomToken();
   const now = Date.now();
-  const result = await env.DB.prepare(`INSERT INTO sessions (token_hash, user_id, expires_at, created_at, auth_strength)
-    SELECT ?, id, ?, ?, ? FROM users WHERE id = ? AND auth_version = ? AND banned = 0`)
-    .bind(await hash(token), now + 30 * 86400_000, now, strength, id, authVersion).run();
+  const target = new URL(safeNext(next, env), env.SITE_URL);
+  let unlock = target.origin === new URL(env.SITE_URL).origin && target.pathname === '/account' ? (unlockedAt ?? now) : 0;
+  if (target.pathname === '/account/unlock/complete') {
+    const intent = await readFlow(env, target.searchParams.get('token') ?? '', 'settings-unlock');
+    if (!intent || intent.user_id !== id || intent.auth_version !== authVersion) return new Response('Use a sign-in method belonging to this account.', {status: 403});
+    // The completion endpoint verifies this fresh session against its browser-bound intent.
+    unlock = 0;
+  }
+  const result = await env.DB.prepare(`INSERT INTO sessions (token_hash, user_id, expires_at, created_at, auth_strength, security_unlocked_at, security_last_used_at)
+    SELECT ?, id, ?, ?, ?, ?, ? FROM users WHERE id = ? AND auth_version = ? AND banned = 0`)
+    .bind(await hash(token), now + 30 * 86400_000, now, strength, unlock, unlock ? now : 0, id, authVersion).run();
   if (result.meta.changes !== 1) return new Response('Sign-in expired. Try again.', { status: 401 });
   const headers = new Headers({ Location: safeNext(next, env), 'Cache-Control': 'no-store' });
   for (const c of sessionCookies(env, token, 30 * 86400)) headers.append('Set-Cookie', c);
@@ -92,15 +100,28 @@ export async function finishPrimary(env: Env, id: string, authVersion: number, n
   if (await version(env, id) !== authVersion) return new Response('Sign-in expired. Try again.', { status: 401 });
   return redirect('/auth/second-factor', token);
 }
-export async function recentProof(req: Request, env: Env, user: User, requireMfa = false): Promise<boolean> {
-  const hasFactor = await env.DB.prepare('SELECT 1 FROM passkeys WHERE user_id = ? UNION ALL SELECT 1 FROM totp_credentials WHERE user_id = ? LIMIT 1').bind(user.id, user.id).first();
+export const SECURITY_IDLE_MS = 30 * 60_000;
+export const SECURITY_MAX_MS = 60 * 60_000;
+export interface SecuritySession { token_hash: string; auth_version: number; auth_strength: string; security_unlocked_at: number }
+export async function securitySession(req: Request, env: Env, user: User, requireMfa = false): Promise<SecuritySession | null> {
+  const now = Date.now();
   for (const token of cookies(req, 'session').slice(0, 2)) {
-    const row = await env.DB.prepare(`SELECT auth_strength FROM sessions WHERE token_hash = ? AND user_id = ? AND kind = 'web' AND expires_at > ? AND created_at > ?`)
-      .bind(await hash(token), user.id, Date.now(), Date.now() - 5 * 60_000).first<{auth_strength: string}>();
-    if (row && (row.auth_strength === 'strong' || row.auth_strength === 'totp' || (!requireMfa && (row.auth_strength === 'recovery' || (!hasFactor && row.auth_strength === 'primary'))))) return true;
+    const row = await env.DB.prepare(`UPDATE sessions SET security_last_used_at = ? WHERE token_hash = ? AND user_id = ? AND kind = 'web'
+      AND expires_at > ? AND security_unlocked_at > ? AND security_last_used_at > ?
+      AND EXISTS (SELECT 1 FROM users WHERE id = sessions.user_id AND banned = 0)
+      AND (auth_strength IN ('strong','totp') OR (? = 0 AND (auth_strength = 'recovery' OR
+        (auth_strength = 'primary' AND NOT EXISTS (SELECT 1 FROM passkeys WHERE user_id = sessions.user_id)
+        AND NOT EXISTS (SELECT 1 FROM totp_credentials WHERE user_id = sessions.user_id)))))
+      RETURNING token_hash, auth_strength, security_unlocked_at, (SELECT auth_version FROM users WHERE id = sessions.user_id) AS auth_version`)
+      .bind(now, await hash(token), user.id, now, now - SECURITY_MAX_MS, now - SECURITY_IDLE_MS, requireMfa ? 1 : 0).first<SecuritySession>();
+    if (row) return row;
   }
-  return false;
+  return null;
 }
+export async function securityProof(req: Request, env: Env, user: User, requireMfa = false): Promise<boolean> {
+  return !!await securitySession(req, env, user, requireMfa);
+}
+
 /** Atomic shared limits, enforced before expensive hashes, also behind multiple Worker instances. */
 export async function limit(env: Env, scope: string, identity: string, max: number, seconds = 900): Promise<boolean> {
   const now = Date.now();

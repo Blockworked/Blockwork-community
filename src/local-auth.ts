@@ -1,5 +1,5 @@
 import type { Env } from './index.ts';
-import { currentUser, hash, isReservedName, safeNext, type User } from './auth.ts';
+import { currentUser, hash, isReservedName, safeNext, PROVIDERS, type User } from './auth.ts';
 import { esc } from './pages.ts';
 import { accountPage as screen } from './account-views.ts';
 import { totpRoute } from './totp.ts';
@@ -7,8 +7,11 @@ import { staffAccounts } from './staff-accounts.ts';
 import { isEmail, normalizeEmail } from './support-mail.ts';
 import { notify, sendAccountToken } from './account-mail.ts';
 import { boundedBody, DUMMY_HASH, finishPrimary, flowToken, hex, limit, makeFlow, newPasswordError, passwordHash,
-  passwordMatches, readFlow, recentProof, redirect, replacePassword, version, type Flow } from './account-security.ts';
+  passwordMatches, readFlow, securityProof, redirect, replacePassword, version, type Flow } from './account-security.ts';
 import { passkeyRoute } from './passkeys.ts';
+import { securityUnlock } from './security-unlock.ts';
+import { emailChange } from './email-change.ts';
+import { oauthSettings } from './oauth.ts';
 import { ACCOUNT_JS } from './account-ui.ts';
 
 const field = (body: Record<string, unknown>, name: string) => typeof body[name] === 'string' ? body[name] as string : '';
@@ -18,7 +21,7 @@ function input(name: string, label: string, type = 'text', autocomplete = name):
 
 
 function error(env: Env, text = 'Verification expired or failed. Sign in and try again.', status = 400): Response {
-  return screen(null, env, 'Account security', `<p role="alert">${esc(text)}</p><p><a href="/login">Sign in</a></p>`, status);
+  return screen(null, env, 'Account security', `<p role="alert">${esc(text)}</p><p><a href="${text.startsWith('Unlock') ? '/account/unlock' : '/login'}">${text.startsWith('Unlock') ? 'Unlock security settings' : 'Sign in'}</a></p>`, status);
 }
 
 function mailNotice(env: Env): Response {
@@ -32,12 +35,24 @@ async function settings(req: Request, env: Env, user: User): Promise<Response> {
   const codes = await env.DB.prepare('SELECT count(*) AS n FROM backup_codes WHERE user_id = ?').bind(user.id).first<{n: number}>();
   const sessions = await env.DB.prepare('SELECT kind, label, created_at FROM sessions WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC LIMIT 50')
     .bind(user.id, Date.now()).all<{kind: string; label: string; created_at: number}>();
-  const ready = await recentProof(req, env, user);
+  const identities = await env.DB.prepare('SELECT provider, label FROM oauth_identities WHERE user_id = ?').bind(user.id).all<{provider: keyof typeof PROVIDERS; label: string}>();
+  const activity = await env.DB.prepare('SELECT action,detail,created_at FROM account_security_events WHERE user_id = ? ORDER BY id DESC LIMIT 10').bind(user.id).all<{action: string; detail: string; created_at: number}>();
+  const pending = await env.DB.prepare('SELECT new_email,old_confirmed,new_confirmed FROM email_changes WHERE user_id = ? AND expires_at > ? AND auth_version = (SELECT auth_version FROM users WHERE id = ?)').bind(user.id, Date.now(), user.id).first<{new_email: string; old_confirmed: number; new_confirmed: number}>();
   return screen(user, env, 'Account security', `
-    ${ready ? '' : '<p class="risky">Sign in again before changing these settings. Security changes require a sign-in within the last five minutes.</p><p><a href="/login?next=%2Faccount">Sign in again</a></p>'}
-    <section class="card"><h2>Email and password</h2>${email ? `<p>${esc(email.email)}</p><form method="post" action="/account/password">${input('password', 'New password', 'password', 'new-password')}<button>Change password</button></form>` :
+    <p>Security settings are unlocked for this browser. Settings lock after 30 minutes of inactivity or one hour total.</p><form method="post" action="/account/lock"><button>Lock security settings</button></form>
+    <section class="card"><h2>Email and password</h2>${email ? `<p>${esc(email.email)}</p><form method="post" action="/account/password">${input('password', 'New password', 'password', 'new-password')}<button>Change password</button></form>
+      <h3>Change linked email</h3><form method="post" action="/account/email-change/start">${input('email', 'New email address', 'email')}<button>Request email change</button></form>
+      <p>Confirm both your current and new email addresses, then finish here. Your current email works until the change is complete.</p>
+      ${pending ? `<p>Pending: ${esc(pending.new_email)} · Current address: ${pending.old_confirmed ? 'confirmed' : 'waiting'} · New address: ${pending.new_confirmed ? 'confirmed' : 'waiting'}</p><form method="post" action="/account/email-change/finish"><button ${pending.old_confirmed && pending.new_confirmed ? '' : 'disabled'}>Finish email change</button></form>` : ''}` :
       `<p>Add verified email credentials to this account. This preserves your packs and support tickets.</p><form method="post" action="/account/email">${input('email', 'Email', 'email')}<button>Verify email</button></form>`}
     <p>Use a unique password with at least 15 characters. Password managers and pasting are supported.</p></section>
+    <section class="card"><h2>Connected sign-in accounts</h2>
+    ${Object.entries(PROVIDERS).map(([provider, name]) => {
+      const connected = identities.results.find(i => i.provider === provider);
+      return `<p>${esc(name)}: ${connected ? esc(connected.label) : 'Not connected'}</p><form ${connected ? '' : 'data-oauth-connect'} method="post" action="/account/oauth/${provider}/${connected ? 'disconnect' : 'connect'}"><button>${connected ? 'Disconnect' : 'Connect'} ${esc(name)}</button></form>`;
+    }).join('')}
+    <p>Connections belong to this account. Connecting or disconnecting signs out other browsers and apps. Keep at least one working sign-in method.</p>
+    <p>To revoke the provider's permission to access your profile, also review connected apps in your Google or GitHub settings.</p></section>
     <section class="card"><h2>Passkeys</h2><p>Use a passkey to sign in directly, or as a second step after your password or Google/GitHub sign-in.</p>
     <ul>${keys.results.map(k => `<li>${esc(k.label)} <form class="inline" method="post" action="/account/passkey/delete"><input type="hidden" name="id" value="${esc(k.id)}"><button>Remove</button></form></li>`).join('') || '<li>No passkeys yet.</li>'}</ul>
     <p><label>Passkey name <input id="passkey-label" type="text" maxlength="80" value="My passkey"></label></p><button type="button" data-passkey="register">Add passkey</button>
@@ -49,6 +64,10 @@ async function settings(req: Request, env: Env, user: User): Promise<Response> {
     <form method="post" action="/account/backup"><button ${keys.results.length || app ? '' : 'disabled'}>Generate new backup codes</button></form><p>Generating codes invalidates all previous codes.</p></section>
     <section class="card"><h2>Signed-in sessions</h2><ul>${sessions.results.map(s => `<li>${s.kind === 'app' ? 'App' : 'Browser'} ${esc(s.label)}${s.created_at ? ` — ${esc(new Date(s.created_at).toISOString().slice(0, 10))}` : ''}</li>`).join('')}</ul>
     <form method="post" action="/account/revoke"><button>Sign out all browsers and apps</button></form></section>
+    <section class="card"><h2>Recent account changes</h2><ul>${activity.results.map(event => {
+      const label = event.action === 'email_changed' ? 'Linked email changed' : event.action === 'oauth_connected' ? 'Sign-in connected' : 'Sign-in disconnected';
+      return `<li>${esc(label)}${event.detail ? `: ${esc(PROVIDERS[event.detail as keyof typeof PROVIDERS] || event.detail)}` : ''} · ${esc(new Date(event.created_at).toISOString())}</li>`;
+    }).join('') || '<li>No recent changes.</li>'}</ul></section>
     <p id="auth-status" role="status"></p><script src="/account.js" defer></script>`);
 }
 
@@ -64,8 +83,13 @@ export async function localAuth(req: Request, env: Env, ctx?: Pick<ExecutionCont
   if (req.method === 'POST' && req.headers.get('Origin') !== new URL(env.SITE_URL).origin) return error(env, 'Cross-site request refused.', 403);
   const user = await currentUser(req, env);
   if (path.startsWith('/staff/accounts')) return staffAccounts(req, env, user, ctx);
+  if (path.startsWith('/account/unlock') || path === '/account/lock') return securityUnlock(req, env, user);
+  if (req.method === 'GET' && path.startsWith('/account/email-change/')) return emailChange(req, env, user);
   if (req.method === 'GET') {
-    if (path === '/account') return user ? settings(req, env, user) : redirect('/login?next=%2Faccount');
+    if (path === '/account') {
+      if (!user) return redirect('/login?next=%2Faccount');
+      return await securityProof(req, env, user) ? settings(req, env, user) : redirect('/account/unlock');
+    }
     if (path === '/auth/email/signup') return screen(user, env, 'Create an account', `<form method="post">${input('name', 'Display name', 'text', 'nickname')}${input('email', 'Email', 'email')}<button class="primary">Verify email</button></form><p>You will set a password after verifying your email.</p>`);
     if (path === '/auth/email/forgot') return screen(user, env, 'Reset password', `<form method="post">${input('email', 'Email', 'email')}<button>Send reset link</button></form><p>Resetting your password signs out all browsers and apps. Your passkeys, authenticator app and backup codes stay in place.</p>`);
     if (path === '/auth/email/verify' || path === '/auth/email/reset') {
@@ -91,6 +115,8 @@ export async function localAuth(req: Request, env: Env, ctx?: Pick<ExecutionCont
   if (!await limit(env, 'auth-ip', ip, 40)) return error(env, 'Too many attempts. Try again in 15 minutes.', 429);
   let body: Record<string, unknown>;
   try { body = await boundedBody(req); } catch { return error(env, 'Invalid or oversized request.', 413); }
+  if (path.startsWith('/account/email-change/')) return emailChange(req, env, user, body);
+  if (path.startsWith('/account/oauth/')) return oauthSettings(req, env, user, path, body);
   if (path.startsWith('/account/totp/') || path === '/auth/totp/verify') return totpRoute(req, env, path, body, user);
   if (path.startsWith('/auth/passkey/') || path === '/auth/backup/verify') return passkeyRoute(req, env, path, body);
   const deliver = async (job: Promise<void>) => {
@@ -116,7 +142,7 @@ export async function localAuth(req: Request, env: Env, ctx?: Pick<ExecutionCont
     if (path === '/auth/email/forgot') {
       if (known && await version(env, known.user_id) >= 0) await deliver(sendAccountToken(env, email, 'reset', known.user_id, {}, 'Reset your Blockworked password'));
     } else if (path === '/account/email') {
-      if (!user || !await recentProof(req, env, user)) return error(env, 'Sign in again before adding email credentials.', 401);
+      if (!user || !await securityProof(req, env, user)) return error(env, 'Unlock Account security before adding email credentials.', 401);
       const attached = await env.DB.prepare('SELECT 1 FROM email_credentials WHERE user_id = ?').bind(user.id).first();
       if (!known && !attached) await deliver(sendAccountToken(env, email, 'verify', user.id, {email, link: true}, 'Verify your Blockworked email'));
     } else {
@@ -130,14 +156,14 @@ export async function localAuth(req: Request, env: Env, ctx?: Pick<ExecutionCont
     if (!await limit(env, 'password-set-ip', ip, 8)) return error(env, 'Too many attempts. Try again in 15 minutes.', 429);
     let flow: Flow | null;
     if (path === '/account/password') {
-      if (!user || !await recentProof(req, env, user)) return error(env, 'Sign in again before changing your password.', 401);
+      if (!user || !await securityProof(req, env, user)) return error(env, 'Unlock Account security before changing your password.', 401);
       const token = await makeFlow(env, 'password-change', user.id, {});
-      if (!await recentProof(req, env, user)) return error(env);
+      if (!await securityProof(req, env, user)) return error(env);
       flow = await readFlow(env, token, 'password-change');
     } else flow = await readFlow(env, field(body, 'token'), path.endsWith('reset') ? 'reset' : 'verify');
     if (!flow) return error(env);
     const data = JSON.parse(flow.data);
-    if (data.link && (!user || user.id !== flow.user_id || !await recentProof(req, env, user))) return error(env, 'Sign in to the account that requested this email address, then reopen the link.', 401);
+    if (data.link && (!user || user.id !== flow.user_id || !await securityProof(req, env, user))) return error(env, 'Sign in to the account that requested this email address, then reopen the link.', 401);
     const invalid = await newPasswordError(password);
     if (invalid) return error(env, invalid);
     const encoded = await passwordHash(password);
@@ -164,9 +190,9 @@ export async function localAuth(req: Request, env: Env, ctx?: Pick<ExecutionCont
     return screen(null, env, 'Email verified', '<p>Your email and password are ready. You can now sign in.</p><p><a href="/login">Sign in</a></p>');
   }
   if (path.startsWith('/account/')) {
-    if (!user || !await recentProof(req, env, user)) return error(env, 'Sign in again before changing security settings.', 401);
+    if (!user || !await securityProof(req, env, user)) return error(env, 'Unlock Account security before changing security settings.', 401);
     const token = await makeFlow(env, 'security-change', user.id, {});
-    if (!await recentProof(req, env, user)) return error(env);
+    if (!await securityProof(req, env, user)) return error(env);
     const flow = await readFlow(env, token, 'security-change');
     if (!flow) return error(env);
     const guard = 'EXISTS (SELECT 1 FROM auth_flows WHERE token_hash = ? AND expires_at > ?)';
@@ -186,10 +212,12 @@ export async function localAuth(req: Request, env: Env, ctx?: Pick<ExecutionCont
     if (path === '/account/passkey/delete') {
       const count = await env.DB.prepare('SELECT count(*) AS n FROM passkeys WHERE user_id = ?').bind(user.id).first<{n: number}>();
       const hasApp = await env.DB.prepare('SELECT 1 FROM totp_credentials WHERE user_id = ?').bind(user.id).first();
+      const primary = await env.DB.prepare('SELECT 1 FROM email_credentials WHERE user_id = ? UNION ALL SELECT 1 FROM oauth_identities WHERE user_id = ? LIMIT 1').bind(user.id, user.id).first();
+      if (count?.n === 1 && !primary) return error(env, 'Add a password or provider sign-in before removing your last passkey.');
       if (!count || (count.n <= 1 && !hasApp)) return error(env, 'Add a replacement passkey or authenticator app before removing the last one.');
       const results = await env.DB.batch([
-        env.DB.prepare(`DELETE FROM passkeys WHERE id = ? AND user_id = ? AND ((SELECT count(*) FROM passkeys WHERE user_id = ?) > 1 OR EXISTS (SELECT 1 FROM totp_credentials WHERE user_id = ?)) AND ${guard}`)
-          .bind(field(body, 'id'), user.id, user.id, user.id, flow.token_hash, now),
+        env.DB.prepare(`DELETE FROM passkeys WHERE id = ? AND user_id = ? AND ((SELECT count(*) FROM passkeys WHERE user_id = ?) > 1 OR EXISTS (SELECT 1 FROM totp_credentials WHERE user_id = ?)) AND ((SELECT count(*) FROM passkeys WHERE user_id = ?) > 1 OR EXISTS (SELECT 1 FROM email_credentials WHERE user_id = ?) OR EXISTS (SELECT 1 FROM oauth_identities WHERE user_id = ?)) AND ${guard}`)
+          .bind(field(body, 'id'), user.id, user.id, user.id, user.id, user.id, user.id, flow.token_hash, now),
         // The first statement must succeed; a second guard ties invalidation to the removed ID.
         env.DB.prepare(`UPDATE users SET auth_version = auth_version + 1 WHERE id = ? AND ${guard} AND NOT EXISTS (SELECT 1 FROM passkeys WHERE id = ?)`)
           .bind(user.id, flow.token_hash, now, field(body, 'id')),

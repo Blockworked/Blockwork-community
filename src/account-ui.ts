@@ -38,6 +38,13 @@ export const ACCOUNT_JS = String.raw`
     } catch (error) { say(error.name === 'NotAllowedError' ? 'Passkey cancelled or unavailable. Try again or use a backup code.' : error.message); }
     finally { button.disabled = false; }
   });
+  for (const form of document.querySelectorAll('[data-oauth-connect]')) form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = form.querySelector('button');
+    button.disabled = true;
+    try { const result = await post(form.action, {}); window.location.assign(result.authorization); }
+    catch (error) { say(error.message); button.disabled = false; }
+  });
   const totp = document.getElementById('totp-form');
   if (totp) totp.addEventListener('submit', async event => {
     event.preventDefault();
