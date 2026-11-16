@@ -1,0 +1,17 @@
+[Unit]
+Description=Encrypted off-site Blockwork service backup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/bin/python3 %h/.local/lib/blockwork-backup/backup.py
+ExecStartPost=/usr/bin/python3 %h/.local/lib/blockwork-backup/backup.py --prune
+ExecStopPost=/usr/bin/python3 %h/.local/lib/blockwork-backup/backup.py --resume
+TimeoutStartSec=45min
+TimeoutStopSec=3min
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+

@@ -1,0 +1,14 @@
+[Unit]
+Description=Download and verify the latest off-site Blockwork backup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/bin/python3 %h/.local/lib/blockwork-backup/backup.py --verify-latest
+TimeoutStartSec=45min
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+

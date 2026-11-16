@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly Blockwork service backup
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 America/Chicago
+RandomizedDelaySec=10min
+Persistent=true
+Unit=blockwork-backup.service
+
+[Install]
+WantedBy=timers.target
