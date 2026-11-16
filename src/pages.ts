@@ -164,10 +164,10 @@ export interface Shell {
 
 export function libraryShell(user: User | null, admin: boolean): Shell {
   const nav = user
-    ? `<a href="/submit">Submit a pack</a><a href="/me">My packs</a><a href="/account">Account settings</a>${admin ? `<a href="/admin">Review</a>` : ""}
+    ? `<a href="/translate">Translate</a><a href="/submit">Submit a pack</a><a href="/me">My packs</a><a href="/account">Account settings</a>${admin ? `<a href="/admin">Review</a>` : ""}
        <span class="who">${user.avatar ? `<img class="avatar" src="${esc(user.avatar)}" alt="">` : ""}${esc(user.name)}</span>
        <form class="inline" method="post" action="/auth/logout"><button class="ghost">Sign out</button></form>`
-    : `<a href="/login">Sign in</a>`;
+    : `<a href="/translate">Translate</a><a href="/login">Sign in</a>`;
   return { name: "Community blocks", href: "/", nav, site: "Blockwork community blocks" };
 }
 

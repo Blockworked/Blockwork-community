@@ -1,6 +1,8 @@
 // The Blockwork community block library: serves index.json and the pack files
 // Blockwork downloads, and takes reviewed submissions from signed-in accounts.
 
+import { translationSite, translationLink } from './translation-site.ts';
+import { translateRoute } from './translate.ts';
 import { cleanupAccountObjects } from './account-lifecycle.ts';
 import { profilePicture } from './profile.ts';
 import { AuthBusyError } from "./account-security.ts";
@@ -22,6 +24,15 @@ import { reviewDecision, reviewFile, reviewPage, reviewQueue, setBanned, setList
 
 export interface Env {
   DB: D1Database;
+  /** Weblate origin and explicit public project/component allowlist. */
+  WEBLATE_URL?: string;
+  /** Public UI address; Weblate itself uses a different origin. */
+  TRANSLATE_URL?: string;
+  WEBLATE_COMPONENTS?: string;
+  WEBLATE_TRANSLATION_LICENSE?: string;
+  /** Read-only project-scoped token and HMAC signing key: Worker secrets. */
+  WEBLATE_READ_TOKEN?: string;
+  WEBLATE_SHARED_SECRET?: string;
   /** Enable only after migration, verified mail sender and adequate Workers CPU are configured. */
   LOCAL_AUTH_ENABLED?: string;
   AUTH_FROM?: string;
@@ -120,6 +131,16 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
   const url = new URL(req.url);
   const path = url.pathname;
   const method = req.method;
+  const translationHost = translationSite(env).origin;
+  const sharedAsset = ["/logo.png", "/favicon.png", "/site.js"].includes(path) || /^\/fonts\/[a-z-]+\.woff2$/.test(path);
+  // Keep account/API routes on the community host; this host serves translations and shared assets.
+  if (url.origin === translationHost && translationHost !== new URL(env.SITE_URL).origin && !sharedAsset) {
+    return translateRoute(req, env, await currentUser(req, env));
+  }
+  // Preserve the initial community URLs as links to the canonical translation site.
+  if (method === "GET" && url.origin === new URL(env.SITE_URL).origin && (path === "/translate" || path.startsWith("/translate/")) && translationHost !== url.origin) {
+    return Response.redirect(new URL(translationLink(env, path) + url.search, env.SITE_URL).href, 308);
+  }
   const avatar = method === 'GET' ? /^\/avatars\/([a-f0-9-]{36})\.png$/.exec(path) : null;
   if (avatar) return profilePicture(env, avatar[1]);
   const account = await localAuth(req, env, ctx);
@@ -156,6 +177,7 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
   if (url.host === new URL(supportUrl(env)).host && url.host !== new URL(env.SITE_URL).host) {
     return Response.redirect(`${env.SITE_URL}${path}${url.search}`, 302);
   }
+  if (path === "/translate" || path.startsWith("/translate/") || path === "/translate.js") return translateRoute(req, env, user);
   const admin = isAdmin(env, user);
   if (method === "GET" && path === "/") return home(env, user, admin, url.searchParams);
   if (method === "GET" && (m = path.match(/^\/renders\/([0-9a-f]{64})\/([A-Za-z0-9_-]{1,64})\.(dark|light)\.(png|webp)$/))) {

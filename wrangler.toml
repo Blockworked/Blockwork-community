@@ -1,15 +1,23 @@
 name = "blockwork-library"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
-# Only the custom domain, so sign-in cookies and OAuth callbacks share one host.
+# Blockworked domains share account cookies; OAuth callbacks stay on the community host.
 workers_dev = false
 routes = [
   { pattern = "community.blockworked.com", custom_domain = true },
   # The helpdesk (src/support.ts). Same Worker, so it shares accounts with the library.
   { pattern = "support.blockworked.com", custom_domain = true },
+  # Enable after the Weblate backend and secrets are ready (docs/translations.md).
+  # { pattern = "translate.blockworked.com", custom_domain = true },
 ]
 
 [vars]
+TRANSLATE_URL = "https://translate.blockworked.com"
+# Translation backend: set after installing ops/weblate/blockworked_auth.py (docs/translations.md).
+# WEBLATE_URL = "https://your-weblate.example.com"
+# WEBLATE_COMPONENTS = "blockwork/ui"
+# WEBLATE_TRANSLATION_LICENSE = "GPL-3.0-only"
+# Set WEBLATE_READ_TOKEN and WEBLATE_SHARED_SECRET as Worker secrets.
 # Set a positive number to restore the username change delay.
 USERNAME_COOLDOWN_DAYS = "0"
 # Enable after following docs/accounts.md; this requires migrations 0012–0014 even when disabled.

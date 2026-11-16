@@ -21,7 +21,7 @@ export function setMainSite(url: string | undefined, support?: string): void {
  *  "/" on the library itself, its full address from the helpdesk. */
 export interface NavPlace {
   community: string;
-  section: "community" | "support";
+  section: "community" | "support" | "translations";
 }
 
 const LIBRARY: NavPlace = { community: "/", section: "community" };

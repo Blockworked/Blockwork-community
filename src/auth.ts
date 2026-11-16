@@ -82,8 +82,8 @@ export async function currentUser(req: Request, env: Env): Promise<User | null> 
   return null;
 }
 
-/** Only same-site paths or the helpdesk, so a login link can't bounce someone to another site. */
-export function safeNext(next: string | null, env?: Pick<Env, "SUPPORT_URL">): string {
+/** Only same-site paths or configured Blockworked services, so a login link can't bounce someone to another site. */
+export function safeNext(next: string | null, env?: Pick<Env, "SUPPORT_URL" | "TRANSLATE_URL">): string {
   if (next && /[\u0000-\u0020\u007f\\]/.test(next)) return "/";
   if (next?.startsWith("/")) {
     try {
@@ -92,12 +92,15 @@ export function safeNext(next: string | null, env?: Pick<Env, "SUPPORT_URL">): s
     } catch {}
     return "/";
   }
-  if (next && env?.SUPPORT_URL) {
-    try {
-      const support = new URL(env.SUPPORT_URL);
-      const url = new URL(next);
-      if (url.origin === support.origin && url.pathname.startsWith(support.pathname)) return url.toString();
-    } catch {}
+  if (next) {
+    for (const target of [env?.SUPPORT_URL, env?.TRANSLATE_URL]) {
+      if (!target) continue;
+      try {
+        const service = new URL(target), url = new URL(next);
+        const base = service.pathname.replace(/\/$/, "");
+        if (url.origin === service.origin && !url.username && !url.password && (url.pathname === base || url.pathname.startsWith(base + "/"))) return url.toString();
+      } catch {}
+    }
   }
   return "/";
 }

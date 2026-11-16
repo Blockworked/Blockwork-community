@@ -40,6 +40,8 @@ npm run typecheck
   app API, Cloudflare setup, and automatic deployments from `master`.
 - [Support and notifications](docs/support.md): email routing, attachment
   limits and privacy, and email, ntfy, and Discord configuration.
+- [Translations](docs/translations.md): Blockworked contributor UI, Weblate
+  authentication adapter, attribution and rollout.
 - [Service backups](docs/backups.md): installed nightly encrypted off-site
   backups, retention, verification, coverage, and recovery instructions.
 
