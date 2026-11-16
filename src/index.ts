@@ -1,6 +1,7 @@
 // The Blockwork community block library: serves index.json and the pack files
 // Blockwork downloads, and takes reviewed submissions from signed-in accounts.
 
+import { webLateGithubHook } from './weblate-hooks.ts';
 import { translationSite, translationLink } from './translation-site.ts';
 import { translateRoute } from './translate.ts';
 import { cleanupAccountObjects } from './account-lifecycle.ts';
@@ -135,6 +136,7 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
   const sharedAsset = ["/logo.png", "/favicon.png", "/site.js"].includes(path) || /^\/fonts\/[a-z-]+\.woff2$/.test(path);
   // Keep account/API routes on the community host; this host serves translations and shared assets.
   if (url.origin === translationHost && translationHost !== new URL(env.SITE_URL).origin && !sharedAsset) {
+    if (path === "/hooks/github/" || path === "/hooks/github") return webLateGithubHook(req, env);
     return translateRoute(req, env, await currentUser(req, env));
   }
   // Preserve the initial community URLs as links to the canonical translation site.

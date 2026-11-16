@@ -91,14 +91,21 @@ class SignedBlockworkedAuthentication(BaseAuthentication):
             if created:
                 user.set_unusable_password()
                 user.save(update_fields=['password'])
-                user.groups.add(group)
+                # New users may inherit Weblate auto-groups; retain only the UI team.
+                user.groups.set([group])
             if (user.email != email or user.has_usable_password() or not user.is_active
                     or user.is_superuser or not user.groups.filter(pk=group.pk).exists()):
                 raise AuthenticationFailed('Blockworked contributor is disabled')
             if user.full_name != identity['name']:
                 user.full_name = identity['name']
                 user.save(update_fields=['full_name'])
-        from weblate.utils.change_origin import change_origin, set_acting_user
-        change_origin.set({'scope': 'api'})
-        set_acting_user(user)
+        # Older Weblate releases attribute changes through request.user directly.
+        try:
+            from weblate.utils.change_origin import change_origin, set_acting_user
+        except ModuleNotFoundError as error:
+            if error.name != 'weblate.utils.change_origin':
+                raise
+        else:
+            change_origin.set({'scope': 'api'})
+            set_acting_user(user)
         return user, None

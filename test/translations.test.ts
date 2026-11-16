@@ -37,7 +37,7 @@ function setup() {
     if (failRead) return new Response('Read failed', {status:503});
     if (url.pathname.endsWith('/translations/')) return Response.json({results:[translation,{...translation,is_source:true,language:{...language,code:'en',name:'English'}}],next:null});
     if (url.pathname.endsWith('/units/')) {
-      assert.equal(url.searchParams.get('q'),'state:<translated AND NOT has:read-only');
+      assert.equal(url.searchParams.get('q'),'state:<translated AND NOT is:read-only');
       return Response.json({results:[unit],count:8,next:null});
     }
     if (url.pathname === '/api/units/42/') return Response.json(unit);
@@ -182,4 +182,44 @@ test('sign-in return targets allow the exact configured translation origin, neve
   assert.equal(safeNext(target,env),target);
   for(const bad of ['https://translate.blockworked.com.evil.example/','https://evil.example/','https://translate.blockworked.com@evil.example/','http://translate.blockworked.com/','https://evil@translate.blockworked.com/']) assert.equal(safeNext(bad,env),'/');
   assert.equal(safeNext('http://localhost:8787/translateevil',{TRANSLATE_URL:'http://localhost:8787/translate'}),'/');
+});
+
+test('encoded Weblate language aliases remain browsable and match canonical unit URLs',async()=>{
+  const f=setup(); const backend=globalThis.fetch;
+  try {
+    f.unit.translation='https://weblate.example.com/api/translations/blockwork/ui/en@pirate/';
+    globalThis.fetch=async(input,init)=>{
+      if(new URL(String(input)).pathname.endsWith('/translations/')) return Response.json({results:[{language:{...language,code:'en@pirate',name:'English (Pirate)',plural:{number:2,formula:'n != 1'}},total:10,translated:2,translated_percent:20,fuzzy:0,is_source:false}],next:null});
+      return backend(input,init);
+    };
+    const response=await f.request('/translate/blockwork/ui/en%40pirate');
+    assert.equal(response.status,200); assert.match(await response.text(),/English \(Pirate\)/);
+    assert.ok(belongsTo(f.env,f.unit,'blockwork/ui','en@pirate'));
+    f.unit.translation='https://weblate.example.com/api/translations/blockwork/ui/en%40pirate/';
+    assert.ok(belongsTo(f.env,f.unit,'blockwork/ui','en@pirate'));
+    assert.equal((await f.request('/translate/blockwork/ui/%ZZ')).status,404);
+  } finally {f.restore();}
+});
+
+test('existing GitHub webhook path forwards to the fixed backend without account cookies',async()=>{
+  const f=setup();
+  try {
+    f.env.TRANSLATE_URL='https://translate.blockworked.com';
+    const {default:worker}=await import('../src/index.ts');
+    let calls=0;
+    globalThis.fetch=async(input,init)=>{
+      calls++;
+      assert.equal(String(input),'https://weblate.example.com/hooks/github/?token=test-hook-secret');
+      assert.equal(init?.method,'POST'); assert.equal(init?.redirect,'manual');
+      const headers=new Headers(init?.headers);
+      assert.equal(headers.get('Cookie'),null); assert.equal(headers.get('Host'),null);
+      assert.equal(headers.get('X-Hub-Signature-256'),'sha256=test-signature');
+      assert.equal(await new Response(init?.body).text(),'{"ref":"refs/heads/master"}');
+      return new Response('Accepted',{status:202});
+    };
+    const response=await worker.fetch(new Request('https://translate.blockworked.com/hooks/github/?token=test-hook-secret',{method:'POST',headers:{Cookie:'session=private-account','X-Hub-Signature-256':'sha256=test-signature','Content-Type':'application/json'},body:'{"ref":"refs/heads/master"}'}),f.env,{} as ExecutionContext);
+    assert.equal(response.status,202); assert.equal(calls,1);
+    assert.equal((await worker.fetch(new Request('https://translate.blockworked.com/hooks/github/'),f.env,{} as ExecutionContext)).status,405);
+    assert.equal(calls,1);
+  } finally {f.restore();}
 });

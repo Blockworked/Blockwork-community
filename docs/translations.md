@@ -109,8 +109,9 @@ Weblate administration/login is unchanged.
    ```
 
 The adapter uses Weblate internals (`User`, `Group`, `Unit`, and
-`weblate.utils.change_origin`). Verify compatibility with your installed Weblate
-release and recheck on upgrades. The protocol and adapter tests cover signatures,
+`weblate.utils.change_origin` when available). Weblate 2026.10.1 attributes
+changes directly through the authenticated request user; newer releases also
+receive the explicit API change-origin context. Recheck compatibility on upgrades. The protocol and adapter tests cover signatures,
 scope, account mapping and replay, but do not replace a smoke test on the real
 installed Weblate version.
 
@@ -188,3 +189,38 @@ Local development can use
 To disable saves, remove the
 Worker signing secret or remove the authenticator from Weblate. To remove the
 UI entirely, remove its component allowlist.
+
+## Live backend configuration
+
+The backend runs Weblate 2026.10.1 at `https://weblate.blockworked.com`, through
+Cloudflare Tunnel `27bcc95d-55ed-4ba9-ae22-7b6480e9c245`. That tunnel is managed
+by Cloudflare: its remote ingress configuration is authoritative. Keep the local
+`~/nextcloud/cloudflared/config.yml` synchronized for recovery. Both backend and
+original translation host ingress rules remain available for rollback.
+
+The `Blockworked translators` team (ID 8) grants Translate on `blockwork/ui` only.
+The reader account belongs only to `Blockworked UI reader` (ID 9), with no edit
+role. Newly mapped contributors have Weblate's automatic default team memberships
+replaced by the dedicated translator team. Native Weblate administration remains
+at the backend address.
+
+The adapter is installed in `/app/data/python/blockworked_auth.py`, configured
+by `/app/data/settings-override.py`. Secret values are private files in Weblate's
+backed-up data volume: `/app/data/blockworked-shared-secret` and
+`/app/data/blockworked-reader-token`. A private copy of the signing key also lives
+under `~/.config/blockworked-translations/` on the server. Worker secret values
+were set directly through Cloudflare and are never committed to Git.
+
+The public `/hooks/github/` endpoint forwards POST requests to the fixed backend
+hostname, retaining the event/signature headers and body while stripping account
+cookies. This preserves existing GitHub webhook deliveries through the domain
+cutover. Weblate still performs the hook validation and repository synchronization.
+The backend client uses an explicit application User-Agent so Cloudflare Browser
+Integrity Check does not mistake it for an unidentified script.
+
+Before rollout, a private database/configuration/DNS rollback snapshot was saved
+on the server under `~/.local/share/blockworked-translations/rollbacks/`; the
+`current-rollback` file in its parent records the exact snapshot directory. That
+snapshot includes the remote tunnel configuration. Roll back the public hostname
+by detaching its Worker custom domain and restoring its saved tunnel CNAME; keep
+the backend running and do not restore the whole database over newer contributions.

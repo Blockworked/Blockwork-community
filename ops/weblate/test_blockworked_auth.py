@@ -84,6 +84,10 @@ class AdapterTests(unittest.TestCase):
         self.origin.set.assert_called_once_with({'scope':'api'})
         with self.assertRaises(AuthenticationFailed): self.adapter.authenticate(self.request)
 
+    def test_older_weblate_without_change_origin_uses_request_user(self):
+        with patch.dict(sys.modules, {'weblate.utils.change_origin': None}):
+            self.assertEqual(self.adapter.authenticate(self.request), (self.user, None))
+
     def test_foreign_component_is_rejected_before_account_creation(self):
         self.unit.translation.component.project.slug = 'private'
         with self.assertRaises(AuthenticationFailed): self.adapter.authenticate(self.request)
@@ -113,6 +117,6 @@ class AdapterTests(unittest.TestCase):
         self.users.objects.get_or_create.return_value = (self.user,True)
         self.adapter.authenticate(self.request)
         self.user.set_unusable_password.assert_called_once()
-        self.user.groups.add.assert_called_once_with(self.groups.objects.filter.return_value.first.return_value)
+        self.user.groups.set.assert_called_once_with([self.groups.objects.filter.return_value.first.return_value])
 
 if __name__ == '__main__': unittest.main()

@@ -28,7 +28,10 @@ function pageNumber(url: URL): number { return Math.max(1, Math.min(100000, Numb
 function pathFor(env: Env, component: string, language: string, all: boolean, p: number): string { return translationLink(env, `${ROOT}/${component}/${encodeURIComponent(language)}?${new URLSearchParams({view: all ? 'all' : 'todo', page:String(p)})}`); }
 
 export async function translateRoute(req: Request, env: Env, user: User | null): Promise<Response> {
-  const url = new URL(req.url), path = translationPath(env,url) ?? url.pathname.replace(/\/$/, '');
+  const url = new URL(req.url);
+  let path: string;
+  try { path = decodeURIComponent(translationPath(env,url) ?? url.pathname.replace(/\/$/, '')); }
+  catch { return render(env,user,'Not found','<h1>Translation not found</h1>',404); }
   if (req.method === 'GET' && url.pathname === '/translate.js') return new Response(TRANSLATE_JS, {headers:{'Content-Type':'text/javascript; charset=utf-8'}});
   if (!['GET','POST'].includes(req.method)) return new Response('Method not allowed', {status:405,headers:{Allow:'GET, POST'}});
   if (req.method === 'POST' && req.headers.get('Origin') !== translationSite(env).origin) return new Response('Cross-site request refused', {status:403});
@@ -67,7 +70,7 @@ export async function translateRoute(req: Request, env: Env, user: User | null):
       }
       return redirect(pathFor(env,component,language,all,all ? p+1 : p) + '&saved=1');
     }
-    const query = new URLSearchParams({page_size:'1',page:String(p),q: all ? 'NOT has:read-only' : 'state:<translated AND NOT has:read-only'});
+    const query = new URLSearchParams({page_size:'1',page:String(p),q: all ? 'NOT is:read-only' : 'state:<translated AND NOT is:read-only'});
     let data: {results:Unit[];count:number;next:string|null};
     try { data = await webRequest(env,`/api/translations/${component}/${encodeURIComponent(language)}/units/?${query}`); }
     catch (error) { if (error instanceof WeblateError && error.status === 404 && p>1) data = {results:[],count:0,next:null}; else throw error; }

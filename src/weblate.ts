@@ -41,7 +41,7 @@ export async function webRequest<T>(env: Env, path: string, body?: object, user?
   if (!path.startsWith('/api/') || new URL(path, base).origin !== base.origin) throw new WeblateError();
   const method = body ? 'PATCH' : 'GET';
   const json = body ? JSON.stringify(body) : '';
-  const headers: Record<string, string> = {Accept: 'application/json'};
+  const headers: Record<string, string> = {Accept: 'application/json', 'User-Agent': 'Blockworked-Translations/1.0 (+https://blockworked.com)'};
   if (body) {
     if (!user || !env.WEBLATE_SHARED_SECRET || env.WEBLATE_SHARED_SECRET.length < 32) throw new WeblateError();
     Object.assign(headers, await signedHeaders(env.WEBLATE_SHARED_SECRET, user, method, path, json));
@@ -69,6 +69,6 @@ export async function snapshot(unit: Unit): Promise<string> {
 export function belongsTo(env: Env, unit: Unit, component: string, language: string): boolean {
   try {
     const url = new URL(unit.translation);
-    return url.origin === apiBase(env).origin && url.pathname === `/api/translations/${component}/${encodeURIComponent(language)}/`;
+    return url.origin === apiBase(env).origin && decodeURIComponent(url.pathname) === `/api/translations/${component}/${language}/`;
   } catch { return false; }
 }
