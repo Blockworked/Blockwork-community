@@ -165,7 +165,7 @@ string, verify its individual author and translated state in Weblate, verify
 an edit to a different project is refused, and verify a removed team member
 cannot save. Then publish the Worker through the existing deployment process.
 The public UI stays at `https://translate.blockworked.com/`. The Worker config
-includes that custom domain as a commented route until the backend is ready; community `/translate` links redirect to it. Account
+binds that custom domain; community `/translate` links redirect to it. Account
 settings and sign-in remain on `community.blockworked.com`, with an explicitly
 allowlisted return URL back to the translation page. `COOKIE_DOMAIN` must remain
 `blockworked.com` so the session is shared.
@@ -176,11 +176,11 @@ reachable at a separate HTTPS backend hostname (for example,
 site domain, allowed hosts, TLS/reverse proxy, and GitHub webhook destination to
 the backend hostname so generated API links and repository hooks keep working.
 Verify the backend and install the adapter there first, configure the Worker
-backend variables and secrets, then uncomment the `translate.blockworked.com`
+backend variables and secrets, then enable the `translate.blockworked.com`
 custom-domain route in `wrangler.toml` and deploy the Worker to switch the public
-host. The route is disabled initially because every push to `master` deploys
-automatically; publishing the code must not take over the existing Weblate host
-before its replacement is ready. Keep the previous
+host. Every push to `master` deploys automatically, so a new installation should
+keep the public-domain route disabled until its backend is ready. The live
+installation now has its backend configured and the route enabled. Keep the previous
 DNS/proxy configuration available for rollback. Do not point `WEBLATE_URL` back
 at the public UI: the Worker rejects that configuration to prevent a request loop.
 
