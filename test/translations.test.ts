@@ -53,7 +53,7 @@ function setup() {
 test('configured projects and language picker use the existing shell and omit source language',async()=>{
   const f=setup(); try {
     const home=await f.request('/translate'); const html=await home.text();
-    assert.match(html,/Help Blockwork speak/); assert.match(html,/Blockworked Translations/);
+    assert.match(html,/<h1>Translations<\/h1>/); assert.match(html,/Blockworked Translations/);
     assert.equal(f.calls.length,0);
     const response=await f.request('/translate/blockwork/ui'); const body=await response.text();
     assert.match(body,/Arabic/); assert.doesNotMatch(body,/data-language="English/);

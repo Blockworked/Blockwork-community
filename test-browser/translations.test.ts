@@ -83,9 +83,9 @@ test('Blockworked contributor browses languages, signs saves, and retains failed
     const page=await context.newPage(), errors:string[]=[];
     page.on('pageerror', e=>errors.push(e.message));
     await page.goto(translateOrigin+'/');
-    await expect(page.getByRole('heading',{name:'Help Blockwork speak your language.'})).toBeVisible();
-    await page.getByRole('link',{name:/Blockwork · UI/}).click();
-    await expect(page.getByRole('heading',{name:'Choose your language.'})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'Translations',exact:true,level:1})).toBeVisible();
+    await page.getByRole('link',{name:/Blockwork UI/}).click();
+    await expect(page.getByRole('heading',{name:'Blockwork UI',level:1})).toBeVisible();
     await page.getByRole('searchbox',{name:'Find a language'}).fill('fr');
     await expect(page.locator('[data-language="Arabic ar"]')).toBeHidden();
     await page.getByRole('link',{name:/French fr/}).click();
@@ -112,7 +112,7 @@ test('Blockworked contributor browses languages, signs saves, and retains failed
     assert.equal(saves,0);
     failSave=false;
     await page.getByLabel('French',{exact:true}).press('Control+Enter');
-    await expect(page.getByRole('heading',{name:'All caught up.'})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'All caught up'})).toBeVisible();
     await expect(page.getByRole('status')).toContainText('Translation saved');
     assert.equal(saves,1); assert.deepEqual(unit.target,['Ouvrir le projet']);
     await page.goto(translateOrigin+'/blockwork/ui/ar');
