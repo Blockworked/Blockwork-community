@@ -42,6 +42,8 @@ SUPPORT_NOTIFY = "ethan@blockworked.com"
 SUPPORT_STAFF = ""
 # Sign-in cookies cover support.blockworked.com too.
 COOKIE_DOMAIN = "blockworked.com"
+# Cloudflare Turnstile's public site key; with the TURNSTILE_SECRET secret it turns the check on (docs/moderation.md).
+# TURNSTILE_SITE_KEY = ""
 
 [[d1_databases]]
 binding = "DB"
@@ -59,6 +61,7 @@ bucket_name = "blockwork-library"
 # Set NTFY_URL as a var for a self-hosted server; defaults to https://ntfy.sh.
 # SMTP2GO_API_KEY (ticket/account email; account mail never logs tokens),
 # AUTH_TOTP_KEY (32 random bytes in base64url, no padding; encrypts authenticator seeds)
+# IP_HASH_KEY (random; keys the network hashes moderation keeps), TURNSTILE_SECRET (docs/moderation.md)
 
 # Memory-hard password hashing needs a paid Workers plan. Benchmark before rollout.
 [limits]

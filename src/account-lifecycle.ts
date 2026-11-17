@@ -57,7 +57,7 @@ export async function lifecycleRoute(req: Request, env: Env, user: User | null, 
     write("UPDATE comments SET body = '[Removed]', deleted_at = ? WHERE user_id = ?",[now,user.id]);
     write('UPDATE packs SET listed = 0 WHERE owner_id = ?',[user.id]);
     for (const table of ['email_credentials','oauth_identities','passkeys','totp_credentials','backup_codes','profile_pictures','account_security_events']) write(`DELETE FROM ${table} WHERE user_id = ?`,[user.id]);
-    write("UPDATE users SET name = 'Deleted account', avatar = '', support_email = NULL, username = NULL, username_changed_at = ?, banned = 1, deleted_at = ?, deactivated_at = ? WHERE id = ?",[now,now,now,user.id]);
+    write("UPDATE users SET name = 'Deleted account', avatar = '', support_email = NULL, ip_hash = NULL, username = NULL, username_changed_at = ?, banned = 1, deleted_at = ?, deactivated_at = ? WHERE id = ?",[now,now,now,user.id]);
   } else write('UPDATE users SET deactivated_at = ? WHERE id = ?',[now,user.id]);
   const applied = await commitCredentialChange(env,flow,proof,{sql:'EXISTS (SELECT 1 FROM users WHERE id = ? AND deactivated_at = 0 AND deleted_at = 0)',params:[user.id]},writes,deleting ? 'account_deleted' : 'account_deactivated');
   if (!applied) return new Response(tp('The account changed. Sign in and try again.'),{status:409});

@@ -286,6 +286,34 @@ msgid "Versions"
 msgstr ""
 
 #: src/browse.ts
+msgid "Report this pack"
+msgstr ""
+
+#: src/browse.ts
+msgid "Reason"
+msgstr ""
+
+#: src/browse.ts
+msgid "Spam"
+msgstr ""
+
+#: src/browse.ts
+msgid "Harmful or malicious"
+msgstr ""
+
+#: src/browse.ts
+msgid "Copied from someone else"
+msgstr ""
+
+#: src/browse.ts
+msgid "Something else"
+msgstr ""
+
+#: src/browse.ts src/comments.ts
+msgid "Report"
+msgstr ""
+
+#: src/browse.ts
 msgid "Source view"
 msgstr ""
 
@@ -355,6 +383,14 @@ msgid "Delete"
 msgstr ""
 
 #: src/comments.ts
+msgid "Report this comment as spam or abuse"
+msgstr ""
+
+#: src/comments.ts
+msgid "Waiting for review"
+msgstr ""
+
+#: src/comments.ts
 #, python-brace-format
 msgid "{link} to comment."
 msgstr ""
@@ -385,6 +421,10 @@ msgstr ""
 
 #: src/comments.ts
 msgid "That's a lot of comments in a few minutes. Try again shortly."
+msgstr ""
+
+#: src/comments.ts
+msgid "You've already posted that."
 msgstr ""
 
 #: src/comments.ts src/index.ts
@@ -563,6 +603,18 @@ msgstr ""
 
 #: src/index.ts src/support.ts
 msgid "There's nothing here."
+msgstr ""
+
+#: src/index.ts
+msgid "Couldn't report that"
+msgstr ""
+
+#: src/index.ts
+msgid "Thanks for the report"
+msgstr ""
+
+#: src/index.ts
+msgid "We'll take a look. Reports stay private."
 msgstr ""
 
 #: src/index.ts src/pages.ts
@@ -1012,6 +1064,10 @@ msgstr ""
 msgid "Email or password is incorrect."
 msgstr ""
 
+#: src/local-auth.ts src/oauth.ts
+msgid "New accounts are paused for a while. Try again later."
+msgstr ""
+
 #: src/local-auth.ts
 msgid "Reset your Blockworked password"
 msgstr ""
@@ -1086,6 +1142,38 @@ msgstr ""
 
 #: src/local-auth.ts
 msgid "Add a replacement passkey or authenticator app before removing the last one."
+msgstr ""
+
+#: src/moderation.ts
+msgid "This account can't post."
+msgstr ""
+
+#: src/moderation.ts
+msgid "Posting from this network isn't allowed right now."
+msgstr ""
+
+#: src/moderation.ts
+msgid "Posting is paused for a while. Try again later."
+msgstr ""
+
+#: src/moderation.ts src/translate.ts
+msgid "That's a lot in a short time. Try again later."
+msgstr ""
+
+#: src/moderation.ts
+msgid "New accounts can only post a little at first. Try again later."
+msgstr ""
+
+#: src/moderation.ts
+msgid "That's a lot from one network in a short time. Try again later."
+msgstr ""
+
+#: src/moderation.ts
+msgid "That's already gone."
+msgstr ""
+
+#: src/moderation.ts
+msgid "You can delete your own instead."
 msgstr ""
 
 #: src/oauth.ts
@@ -1547,6 +1635,10 @@ msgid "That's a lot of tickets in an hour. Try again later."
 msgstr ""
 
 #: src/support.ts
+msgid "That email address can't be used here."
+msgstr ""
+
+#: src/support.ts
 msgid "internal note"
 msgstr ""
 
@@ -1773,6 +1865,10 @@ msgstr ""
 
 #: src/translate.ts
 msgid "Request declined."
+msgstr ""
+
+#: src/translate.ts
+msgid "Try again later"
 msgstr ""
 
 #: src/translate.ts

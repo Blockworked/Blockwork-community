@@ -9,6 +9,7 @@ import { formImages, imageField, mailImages, storeImages, type ImageAttachment, 
 import { hash, isAdmin, logout, PROVIDERS, randomToken, type User } from "./auth.ts";
 import type { Env } from "./index.ts";
 import { esc, page, type Shell } from "./pages.ts";
+import { blockedAddress, passedTurnstile, record, screen, TURNSTILE_FAILED, turnstileWidget, type Change } from "./moderation.ts";
 import { commentHtml } from "./comments.ts";
 import {
   fromAddress,
@@ -20,9 +21,12 @@ import {
   tidy,
 } from "./support-mail.ts";
 
-export type Status = "open" | "answered" | "closed";
-const STATUS_LABEL: Record<Status, string> = { open: tp("Waiting on us"), answered: tp("Waiting on you"), closed: "Closed" };
-const STAFF_LABEL: Record<Status, string> = { open: tp("Needs an answer"), answered: "Answered", closed: "Closed" };
+export type Status = "open" | "answered" | "closed" | "spam";
+// A requester never learns their ticket was marked spam.
+const STATUS_LABEL: Record<Status, string> = { open: tp("Waiting on us"), answered: tp("Waiting on you"), closed: "Closed", spam: tp("Waiting on us") };
+const STAFF_LABEL: Record<Status, string> = { open: tp("Needs an answer"), answered: "Answered", closed: "Closed", spam: "Spam" };
+/** New tickets by email from anyone, per hour, before the rest go to Spam unannounced. */
+export const EMAIL_TICKETS_PER_HOUR = 40;
 
 export const NEW_TICKETS_PER_HOUR = 5;
 const MAX_SUBJECT = 200;
@@ -136,7 +140,7 @@ export async function supportRoute(req: Request, env: Env, path: string, user: U
     if (method === "POST" && m[2] === "/reply") return reply(req, env, user, staff, id);
     if (method === "POST" && m[2] === "/status") {
       if (!staff) return notFound(env, user, staff);
-      return setStatus(req, env, id);
+      return setStatus(req, env, id, user!);
     }
   }
   return notFound(env, user, staff);
@@ -215,6 +219,7 @@ async function newForm(env: Env, user: User, staff: boolean, error = "", draft: 
        <label class="field" for="body">${tt('What\'s going on?')}</label>
        <textarea id="body" name="body" required maxlength="${MAX_BODY}" placeholder="${tt('What you were doing, what happened, and your Blockwork version if it\'s about the app')}">${esc(draft.body ?? "")}</textarea>
        ${imageField}
+       ${staff ? "" : turnstileWidget(env)}
        <p class="form-foot"><span class="muted">${tt('Plain text. Links work.')}</span><button class="primary">${tt('Send')}</button></p>
      </form>`,
     error ? 400 : 200,
@@ -243,24 +248,35 @@ async function createFromForm(req: Request, env: Env, user: User, staff: boolean
     .bind(user.id, Date.now() - 3600_000)
     .first<{ n: number }>();
   if (!staff && (recent?.n ?? 0) >= NEW_TICKETS_PER_HOUR) return newForm(env, user, staff, tp("That's a lot of tickets in an hour. Try again later."), draft);
+  if (!staff && !(await passedTurnstile(env, req, form.get("cf-turnstile-response")))) return newForm(env, user, staff, TURNSTILE_FAILED, draft);
+  const verdict = staff ? null : await screen(env, req, user, "ticket");
+  if (verdict && !verdict.ok) return newForm(env, user, staff, verdict.error, draft);
+  if (email && !staff && (await blockedAddress(env, email))) return newForm(env, user, staff, tp("That email address can't be used here."), draft);
   let images: ImageAttachment[];
   try { images = await formImages(form); } catch (error) { return newForm(env, user, staff, (error as Error).message, draft); }
   await env.DB.prepare("UPDATE users SET support_email = ? WHERE id = ? AND deactivated_at = 0 AND deleted_at = 0").bind(email, user.id).run();
-  const { ticket } = await openTicket(env, { subject, body, email, name: user.name, userId: user.id, emailId: null, images });
+  const { ticket } = await openTicket(env, { subject, body, email, name: user.name, userId: user.id, emailId: null, images, spam: !!verdict?.hidden, ipHash: verdict?.ipHash ?? null });
   return redirect(link(env, `/tickets/${ticket.id}`));
 }
 
 /** Files a ticket and sends the receipt and the staff notice. Returns it and its key. */
 export async function openTicket(
   env: Env,
-  t: { subject: string; body: string; email: string; name: string; userId: string | null; emailId: string | null; images?: ImageAttachment[] },
+  t: {
+    subject: string; body: string; email: string; name: string; userId: string | null; emailId: string | null; images?: ImageAttachment[];
+    /** Filed straight into Spam: nobody is told, and no receipt goes out. */
+    spam?: boolean;
+    /** Whether to send the requester a receipt. Off for mail whose sender couldn't be verified, so spoofed senders get no backscatter. */
+    receipt?: boolean;
+    ipHash?: string | null;
+  },
 ): Promise<{ ticket: Ticket; key: string }> {
   const now = Date.now();
   const key = randomToken();
   const ticket = (await env.DB.prepare(
-    "INSERT INTO tickets (subject, status, email, name, user_id, access_key, created_at, updated_at) VALUES (?, 'open', ?, ?, ?, ?, ?, ?) RETURNING *",
+    "INSERT INTO tickets (subject, status, email, name, user_id, access_key, created_at, updated_at, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
   )
-    .bind(t.subject, t.email, t.name.slice(0, 120), t.userId, key, now, now)
+    .bind(t.subject, t.spam ? "spam" : "open", t.email, t.name.slice(0, 120), t.userId, key, now, now, t.ipHash ?? null)
     .first<Ticket>())!;
   const first = await env.DB.prepare(
     "INSERT INTO ticket_messages (ticket_id, kind, user_id, body, email_id, created_at) VALUES (?, 'requester', ?, ?, ?, ?) RETURNING id",
@@ -271,8 +287,9 @@ export async function openTicket(
   const receiptId = messageId(env, ticket.id, first!.id);
   // The receipt is what an emailed reply answers when the ticket came from the site.
   if (!t.emailId) await env.DB.prepare("UPDATE ticket_messages SET email_id = ? WHERE id = ?").bind(receiptId, first!.id).run();
+  if (t.spam) return { ticket, key };
   await Promise.all([
-    t.email ? sendMail(env, {
+    t.email && t.receipt !== false ? sendMail(env, {
       to: [t.email],
       subject: `[#${ticket.id}] ${ticket.subject}`,
       text: `Thanks for getting in touch. We've got your message and will answer as soon as we can.\n\nTo add anything, reply to this email or open the ticket:\n${keyLink(env, ticket.id, key)}\n\n---\n${t.body}`,
@@ -345,9 +362,11 @@ async function ticketPage(env: Env, user: User | null, staff: boolean, id: numbe
   const staffBits = staff
     ? `<p class="muted meta"><span>From ${esc(t.name ? `${t.name} <${t.email}>` : t.email)}</span>${t.user_id ? `<span>account ${esc(t.user_id)}</span>` : `<span>${tt('by email')}</span>`}<span>opened ${esc(when(t.created_at))}</span></p>
        <form class="ticket-actions" method="post" action="${link(env, `/tickets/${t.id}/status`)}">
-         ${t.status === "closed" ? `<button name="status" value="open">${tt('Reopen')}</button>` : `<button name="status" value="closed">${tt('Close')}</button>`}
+         ${t.status === "closed" || t.status === "spam" ? `<button name="status" value="open">${t.status === "spam" ? "Not spam" : tt('Reopen')}</button>` : `<button name="status" value="closed">${tt('Close')}</button>`}
          ${t.status === "open" ? `<button class="ghost" name="status" value="answered">${tt('Mark answered')}</button>` : ""}
-       </form>`
+         ${t.status === "spam" ? "" : `<button class="ghost" name="status" value="spam">Spam</button>${t.email ? `<label class="muted"><input type="checkbox" name="block" value="1"> and block ${esc(t.email)}</label>` : ""}`}
+       </form>
+       ${t.user_id && isAdmin(env, user) ? `<p class="muted"><a href="${esc(env.SITE_URL)}/admin/users/${encodeURIComponent(t.user_id)}">Moderate this account</a> (ban, roll back)</p>` : ""}`
     : `<p class="muted meta"><span>Opened ${esc(when(t.created_at))}</span></p>`;
   const crumbs = staff ? `<p class="crumbs"><a href="${link(env, "/queue")}">${tt('Queue')}</a></p>` : user ? `<p class="crumbs"><a href="${link(env, "/")}">${tt('My tickets')}</a></p>` : "";
   return page(
@@ -388,8 +407,10 @@ export async function addMessage(env: Env, t: Ticket, kind: "requester" | "staff
     .bind(t.id, kind, userId, body, emailId, now)
     .first<{ id: number }>();
   await storeImages(env, row!.id, images);
-  const status: Status = kind === "requester" ? "open" : kind === "staff" ? "answered" : t.status;
+  // A reply to a spam ticket stays in Spam, unannounced.
+  const status: Status = t.status === "spam" && kind === "requester" ? "spam" : kind === "requester" ? "open" : kind === "staff" ? "answered" : t.status;
   await env.DB.prepare("UPDATE tickets SET status = ?, updated_at = ? WHERE id = ?").bind(status, now, t.id).run();
+  if (kind === "requester" && t.status === "spam") return;
   if (kind === "requester") {
     await notifyStaff(env, t, `${t.name || t.email} replied${t.status === "closed" ? " and reopened it" : ""}:`, body, images);
   } else if (kind === "staff" && t.email) {
@@ -412,15 +433,23 @@ export async function addMessage(env: Env, t: Ticket, kind: "requester" | "staff
   }
 }
 
-async function setStatus(req: Request, env: Env, id: number): Promise<Response> {
-  const status = String((await req.formData()).get("status") ?? "");
-  if (status !== "open" && status !== "answered" && status !== "closed") return new Response(tp("Bad request"), { status: 400 });
-  await env.DB.prepare("UPDATE tickets SET status = ?, updated_at = ? WHERE id = ?").bind(status, Date.now(), id).run();
-  return redirect(link(env, `/tickets/${id}`));
+async function setStatus(req: Request, env: Env, id: number, actor: User): Promise<Response> {
+  const form = await req.formData();
+  const status = String(form.get("status") ?? "");
+  if (status !== "open" && status !== "answered" && status !== "closed" && status !== "spam") return new Response(tp("Bad request"), { status: 400 });
+  const t = await loadTicket(env, id);
+  if (!t) return new Response(tp("Not found"), { status: 404 });
+  const changes: Change[] = [{ kind: "ticket", id, before: { status: t.status }, after: { status } }];
+  // Spam from an address can block it, so its next mail is dropped.
+  if (status === "spam" && form.get("block") === "1" && t.email) changes.push({ kind: "block", id: t.email, before: {}, after: { kind: "email", value: t.email, reason: `Spam ticket #${id}` } });
+  if (status === "spam" || t.status === "spam") await record(env, actor.id, status === "spam" ? "ticket-spam" : "ticket-not-spam", { kind: "ticket", id }, t.email, changes);
+  else await env.DB.prepare("UPDATE tickets SET status = ? WHERE id = ?").bind(status, id).run();
+  await env.DB.prepare("UPDATE tickets SET updated_at = ? WHERE id = ?").bind(Date.now(), id).run();
+  return redirect(link(env, status === "spam" ? "/queue" : `/tickets/${id}`));
 }
 
 async function queue(env: Env, user: User, wanted: string | null): Promise<Response> {
-  const status: Status = wanted === "answered" || wanted === "closed" ? wanted : "open";
+  const status: Status = wanted === "answered" || wanted === "closed" || wanted === "spam" ? wanted : "open";
   const { results } = await env.DB.prepare(
     `SELECT * FROM tickets WHERE status = ? ORDER BY ${status === "open" ? "updated_at ASC" : "updated_at DESC"} LIMIT 300`,
   )
@@ -428,7 +457,7 @@ async function queue(env: Env, user: User, wanted: string | null): Promise<Respo
     .all<Ticket>();
   const counts = await env.DB.prepare("SELECT status, COUNT(*) AS n FROM tickets GROUP BY status").all<{ status: Status; n: number }>();
   const count = (s: Status) => counts.results.find((r) => r.status === s)?.n ?? 0;
-  const tabs = (["open", "answered", "closed"] as Status[])
+  const tabs = (["open", "answered", "closed", "spam"] as Status[])
     .map((s) => `<a href="${link(env, `/queue?status=${s}`)}"${s === status ? ` aria-current="page"` : ""}>${esc(STAFF_LABEL[s])} <span class="n">${count(s)}</span></a>`)
     .join("");
   const list = results.length

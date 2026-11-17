@@ -6,19 +6,33 @@ import { capabilityList, esc, message, page } from "./pages.ts";
 import { packCard, sourceView, withBlockViews, type VersionRow } from "./browse.ts";
 import { blockPictures, redraw } from "./renders.ts";
 import type { Env } from "./index.ts";
+import { note, record, type Change } from "./moderation.ts";
+import { MOD_CSS } from "./moderation-admin.ts";
 
 export async function reviewQueue(env: Env, user: User, admin: boolean): Promise<Response> {
   const { results } = await env.DB.prepare(
-    `SELECT v.*, u.name AS author FROM versions v JOIN users u ON u.id = v.submitted_by
+    `SELECT v.*, u.name AS author, u.shadowbanned AS shadowbanned, u.created_at AS user_created FROM versions v JOIN users u ON u.id = v.submitted_by
      WHERE v.status = 'pending' ORDER BY v.submitted_at`,
-  ).all<VersionRow>();
+  ).all<VersionRow & { shadowbanned: number; user_created: number }>();
   await withBlockViews(env, results);
-  const list = results.map((v) => packCard(v, `<p><a class="button primary" href="/admin/versions/${v.id}">Review</a></p>`)).join("");
+  const card = (v: VersionRow & { user_created: number }) =>
+    packCard(
+      v,
+      `<p class="mod-actions"><label><input type="checkbox" name="v" value="${v.id}" form="bulk"> Select</label>
+       <a class="button primary" href="/admin/versions/${v.id}">Review</a>
+       <a href="/admin/users/${encodeURIComponent(v.submitted_by)}">${esc(v.author)}</a>${v.user_created > Date.now() - 3 * 86400_000 ? ` <span class="muted">new account</span>` : ""}</p>`,
+    );
+  const list = results.filter((v) => !v.shadowbanned).map(card).join("");
+  const hidden = results.filter((v) => v.shadowbanned).map(card).join("");
   return page(
     "Review",
     user,
     admin,
-    `<h1>Waiting for review</h1>${list || `<p class="muted">Nothing to review.</p>`}
+    `${MOD_CSS}<p class="crumbs"><a href="/admin/moderation">Moderation</a> · <a href="/admin/moderation/log">Moderation log</a></p>
+     <h1>Waiting for review</h1>${list || `<p class="muted">Nothing to review.</p>`}
+     ${hidden ? `<h2>From shadowbanned accounts</h2><p class="muted">They think these are waiting like any other.</p>${hidden}` : ""}
+     ${results.length ? `<form id="bulk" method="post" action="/admin/versions" class="mod-actions"><input type="text" name="reason" placeholder="Reason (shown to the submitter)" maxlength="300">
+       <button>Reject selected</button></form>` : ""}
      <p class="muted"><a href="/admin/renders">Draw block pictures</a> for versions that don't have them yet.</p>`,
   );
 }
@@ -79,35 +93,37 @@ export async function reviewFile(env: Env, id: number): Promise<Response> {
   return new Response(object.body, { headers: { "Content-Type": "application/json" } });
 }
 
-export async function reviewDecision(req: Request, env: Env, id: number): Promise<Response> {
+export async function reviewDecision(req: Request, env: Env, id: number, actor: User): Promise<Response> {
   const form = await req.formData();
   const action = form.get("action");
   const reason = String(form.get("reason") ?? "").trim().slice(0, 300);
   if (action !== "approve" && action !== "reject") return new Response("Bad request", { status: 400 });
-  await env.DB.prepare("UPDATE versions SET status = ?, reason = ?, reviewed_at = ? WHERE id = ? AND status = 'pending'")
+  const result = await env.DB.prepare("UPDATE versions SET status = ?, reason = ?, reviewed_at = ? WHERE id = ? AND status = 'pending'")
     .bind(action === "approve" ? "approved" : "rejected", action === "approve" ? "" : reason, Date.now(), id)
     .run();
+  if (result.meta.changes) await note(env, actor.id, action, { kind: "version", id }, reason);
   return new Response(null, { status: 303, headers: { Location: "/admin" } });
 }
 
-export async function setListed(req: Request, env: Env, packId: string): Promise<Response> {
+export async function setListed(req: Request, env: Env, packId: string, actor: User): Promise<Response> {
   const action = (await req.formData()).get("action");
-  await env.DB.prepare("UPDATE packs SET listed = ? WHERE id = ?").bind(action === "list" ? 1 : 0, packId).run();
+  const pack = await env.DB.prepare("SELECT listed FROM packs WHERE id = ?").bind(packId).first<{ listed: number }>();
+  if (pack) await record(env, actor.id, action === "list" ? "list-pack" : "unlist-pack", { kind: "pack", id: packId }, "", [{ kind: "pack", id: packId, before: { listed: pack.listed }, after: { listed: action === "list" ? 1 : 0 } }]);
   return new Response(null, { status: 303, headers: { Location: "/admin" } });
 }
 
-export async function setBanned(req: Request, env: Env, userId: string): Promise<Response> {
-  const ban = (await req.formData()).get("action") === "ban";
-  const statements = [env.DB.prepare("UPDATE users SET banned = ? WHERE id = ? AND deleted_at = 0").bind(ban ? 1 : 0, userId)];
-  if (ban) {
-    statements.push(
-      env.DB.prepare("UPDATE versions SET status = 'rejected', reason = 'Account banned', reviewed_at = ? WHERE submitted_by = ? AND status = 'pending'").bind(
-        Date.now(),
-        userId,
-      ),
-      env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(userId),
-    );
+/** Rejects a set of uploads at once, from the review queue. Logged, so it can be undone. */
+export async function bulkVersions(req: Request, env: Env, actor: User): Promise<Response> {
+  const form = await req.formData();
+  const ids = form.getAll("v").map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 500);
+  if (ids.length) {
+    const { results } = await env.DB.prepare(`SELECT id, reason, reviewed_at FROM versions WHERE status = 'pending' AND id IN (${ids.map(() => "?").join(",")})`)
+      .bind(...ids)
+      .all<{ id: number; reason: string; reviewed_at: number | null }>();
+    const reason = String(form.get("reason") ?? "").trim().slice(0, 300) || "Removed by moderation";
+    await record(env, actor.id, "reject-uploads", { kind: "versions", id: ids.join(",").slice(0, 200) }, reason, results.map((v): Change => ({
+      kind: "version", id: v.id, before: { status: "pending", reason: v.reason, reviewed_at: v.reviewed_at }, after: { status: "rejected", reason, reviewed_at: Date.now() },
+    })));
   }
-  await env.DB.batch(statements);
   return new Response(null, { status: 303, headers: { Location: "/admin" } });
 }

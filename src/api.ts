@@ -9,6 +9,7 @@ import type { Env } from "./index.ts";
 import { esc, page } from "./pages.ts";
 import { OFFICIAL_OWNER, readPack, sha256Hex, stampPack, type PackMeta } from "./packs.ts";
 import { listedPack, withBlockViews } from "./browse.ts";
+import { screen } from "./moderation.ts";
 import { addComment, canDelete, listComments, removeComment } from "./comments.ts";
 
 const APP_SESSION_DAYS = 365;
@@ -161,6 +162,7 @@ const MAX_PER_DAY = 20;
 /** Checks and stores an uploaded pack as a version waiting for review, for /submit and the app alike. */
 export async function acceptUpload(
   env: Env,
+  req: Request | null,
   user: User,
   upload: Uint8Array,
 ): Promise<{ error: string } | { meta: PackMeta; sha: string; update: boolean }> {
@@ -173,6 +175,8 @@ export async function acceptUpload(
     .first<{ pending: number | null; today: number | null }>();
   if ((counts?.pending ?? 0) >= MAX_PENDING) return { error: `You have ${MAX_PENDING} packs waiting for review. Try again once they're reviewed.` };
   if ((counts?.today ?? 0) >= MAX_PER_DAY) return { error: "That's a lot of uploads for one day. Try again tomorrow." };
+  const verdict = await screen(env, req, user, "pack");
+  if (!verdict.ok) return { error: verdict.error };
 
   const meta = readPack(upload, user.name);
   if (typeof meta === "string") return { error: meta };
@@ -197,9 +201,9 @@ export async function acceptUpload(
       "UPDATE versions SET status = 'rejected', reason = 'Replaced by a newer upload', reviewed_at = ? WHERE pack_id = ? AND status = 'pending'",
     ).bind(now, meta.id),
     env.DB.prepare(
-      `INSERT INTO versions (pack_id, sha256, name, description, version, blocks, block_views, capabilities, status, submitted_by, submitted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
-    ).bind(meta.id, sha, meta.name, meta.description, meta.version, JSON.stringify(meta.blocks), JSON.stringify(meta.views), JSON.stringify(meta.capabilities), user.id, now),
+      `INSERT INTO versions (pack_id, sha256, name, description, version, blocks, block_views, capabilities, status, submitted_by, submitted_at, ip_hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
+    ).bind(meta.id, sha, meta.name, meta.description, meta.version, JSON.stringify(meta.blocks), JSON.stringify(meta.views), JSON.stringify(meta.capabilities), user.id, now, verdict.ipHash),
   ];
   if (!pack) {
     statements.unshift(env.DB.prepare("INSERT INTO packs (id, owner_id, created_at) VALUES (?, ?, ?)").bind(meta.id, user.id, now));
@@ -210,7 +214,8 @@ export async function acceptUpload(
     : null;
   const saved = await env.DB.batch(statements);
   const versionId = saved[saved.length - 1].meta.last_row_id;
-  await notify(env, { title: `Pack submission: ${meta.name}`, text: `${user.name} submitted ${meta.name} (${meta.version}) for review.`, url: `${env.SITE_URL}/admin/versions/${versionId}` });
+  // A shadowbanned account's uploads wait in their own corner of the queue, unannounced.
+  if (!verdict.hidden) await notify(env, { title: `Pack submission: ${meta.name}`, text: `${user.name} submitted ${meta.name} (${meta.version}) for review.`, url: `${env.SITE_URL}/admin/versions/${versionId}` });
   return { meta, sha, update: !!listed };
 }
 
@@ -228,6 +233,8 @@ function commentJson(c: Awaited<ReturnType<typeof listComments>>[number], user: 
     can_delete: canDelete(user, admin, ownerId, c),
     body: c.body,
     created: c.created_at,
+    // Only the writer gets their held comment back; Blockwork can mark it.
+    waiting_for_review: !!c.held && !!user && user.id === c.user_id,
   };
 }
 
@@ -239,7 +246,7 @@ async function packDetail(env: Env, user: User | null, admin: boolean, id: strin
     env.DB.prepare("SELECT version, sha256, submitted_at, reviewed_at FROM versions WHERE pack_id = ? AND status = 'approved' ORDER BY id DESC LIMIT 50")
       .bind(p.pack_id)
       .all<{ version: string; sha256: string; submitted_at: number; reviewed_at: number | null }>(),
-    listComments(env, p.pack_id),
+    listComments(env, p.pack_id, user?.id),
   ]);
   return json({
     id: p.pack_id,
@@ -315,7 +322,7 @@ async function me(env: Env, user: User): Promise<Response> {
 async function upload(req: Request, env: Env, user: User): Promise<Response> {
   const length = Number(req.headers.get("Content-Length") ?? 0);
   if (length > 4 * 1024 * 1024) return fail("That file is over 2 MB.", 413);
-  const result = await acceptUpload(env, user, new Uint8Array(await req.arrayBuffer()));
+  const result = await acceptUpload(env, req, user, new Uint8Array(await req.arrayBuffer()));
   if ("error" in result) return fail(result.error);
   return json({ id: result.meta.id, name: result.meta.name, version: result.meta.version, sha256: result.sha, status: "pending", update: result.update });
 }
@@ -348,10 +355,10 @@ export async function api(req: Request, env: Env, path: string): Promise<Respons
       id = decodeURIComponent(m[1]);
     } catch {}
     const { body: text } = await body(req);
-    const result = await addComment(env, user, admin, id, typeof text === "string" ? text : "");
+    const result = await addComment(env, req, user, admin, id, typeof text === "string" ? text : "");
     if ("error" in result) return fail(result.error, result.status);
     const p = await listedPack(env, id);
-    const added = (await listComments(env, id)).find((c) => c.id === result.id);
+    const added = (await listComments(env, id, user.id)).find((c) => c.id === result.id);
     return added && p ? json(commentJson(added, user, admin, p.owner_id)) : json({ id: result.id });
   }
   if (method === "DELETE" && (m = path.match(/^\/api\/v1\/comments\/(\d+)$/))) {

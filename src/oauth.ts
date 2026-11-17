@@ -1,4 +1,5 @@
 // Provider identities are independent from account IDs. Email is never a linking signal.
+import { signupsOpen } from './moderation.ts';
 import { t, tn, tp, raw } from './i18n.ts';
 import { createRemoteJWKSet, jwtVerify, customFetch } from 'jose';
 import type { Env } from './index.ts';
@@ -118,6 +119,7 @@ export async function callback(req: Request, env: Env, provider: Provider): Prom
     // A security-settings re-auth must use an identity already belonging to this account.
     if (new URL(next, env.SITE_URL).pathname === '/account/unlock/complete') return failure(env, tp('Use a sign-in method already connected to your account.'), 403);
     if (isReservedName(profile.name) && !isAdmin(env, {id: profile.id, name: profile.name, avatar: '', banned: 0})) return failure(env, tp('This display name is reserved for the Blockworked team.'), 403);
+    if (!await signupsOpen(env)) return failure(env, tp('New accounts are paused for a while. Try again later.'), 503);
     const used = await env.DB.prepare('SELECT 1 FROM users WHERE id = ?').bind(profile.id).first();
     const id = used ? `account:${crypto.randomUUID()}` : profile.id;
     const now = Date.now();

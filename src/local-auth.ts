@@ -16,6 +16,7 @@ import { oauthSettings } from './oauth.ts';
 import { lifecycleRoute } from './account-lifecycle.ts';
 import { profileRoute } from './profile.ts';
 import { ACCOUNT_JS } from './account-ui.ts';
+import { blockedAddress, passedTurnstile, signupsOpen, TURNSTILE_FAILED, turnstileWidget } from './moderation.ts';
 
 const field = (body: Record<string, unknown>, name: string) => typeof body[name] === 'string' ? body[name] as string : '';
 function input(name: string, label: string, type = 'text', autocomplete = name): string {
@@ -94,8 +95,8 @@ export async function localAuth(req: Request, env: Env, ctx?: Pick<ExecutionCont
       if (!user) return redirect('/login?next=%2Faccount%2Fsecurity');
       return await securityProof(req, env, user) ? settings(req, env, user) : redirect('/account/unlock');
     }
-    if (path === '/auth/email/signup') return screen(user, env, tp('Create an account'), `<form method="post">${input('name', tp('Display name'), 'text', 'nickname')}${input('email', 'Email', 'email')}<button class="primary">${t('Verify email')}</button></form><p>${t('You will set a password after verifying your email.')}</p>`);
-    if (path === '/auth/email/forgot') return screen(user, env, tp('Reset password'), `<form method="post">${input('email', 'Email', 'email')}<button>${t('Send reset link')}</button></form><p>${t('Resetting your password signs out all browsers and apps. Your passkeys, authenticator app and backup codes stay in place.')}</p>`);
+    if (path === '/auth/email/signup') return screen(user, env, tp('Create an account'), `<form method="post">${input('name', tp('Display name'), 'text', 'nickname')}${input('email', 'Email', 'email')}${turnstileWidget(env)}<button class="primary">${t('Verify email')}</button></form><p>${t('You will set a password after verifying your email.')}</p>`);
+    if (path === '/auth/email/forgot') return screen(user, env, tp('Reset password'), `<form method="post">${input('email', 'Email', 'email')}${turnstileWidget(env)}<button>${t('Send reset link')}</button></form><p>${t('Resetting your password signs out all browsers and apps. Your passkeys, authenticator app and backup codes stay in place.')}</p>`);
     if (path === '/auth/email/verify' || path === '/auth/email/reset') {
       const purpose = path.endsWith('reset') ? 'reset' : 'verify';
       const token = url.searchParams.get('token') ?? '';
@@ -141,6 +142,10 @@ export async function localAuth(req: Request, env: Env, ctx?: Pick<ExecutionCont
   if (path === '/auth/email/signup' || path === '/auth/email/forgot' || path === '/account/email') {
     if (!env.SMTP2GO_API_KEY) return error(env, tp('Account email is temporarily unavailable.'), 503);
     if (!isEmail(email)) return error(env, tp('Enter a valid email address.'));
+    if (path !== '/account/email' && !await passedTurnstile(env, req, field(body, 'cf-turnstile-response'))) return error(env, TURNSTILE_FAILED, 400);
+    if (path === '/auth/email/signup' && !await signupsOpen(env)) return error(env, tp('New accounts are paused for a while. Try again later.'), 503);
+    // A blocked address or domain is told the same as everyone, and sent nothing.
+    if (path !== '/auth/email/forgot' && await blockedAddress(env, email)) return mailNotice(env);
     if (!await limit(env, 'mail-email', email, 4, 3600) || !await limit(env, 'mail-ip', ip, 10, 3600)) return mailNotice(env);
     const known = await env.DB.prepare('SELECT user_id FROM email_credentials WHERE email = ?').bind(email).first<{user_id: string}>();
     if (path === '/auth/email/forgot') {

@@ -22,7 +22,9 @@ import { FAVICON_PNG, LOGO_PNG } from "./logo.ts";
 import { setMainSite, SITE_JS } from "./site-nav.ts";
 import { supportPath, supportRoute, supportUrl } from "./support.ts";
 import { receiveEmail } from "./support-inbound.ts";
-import { reviewDecision, reviewFile, reviewPage, reviewQueue, setBanned, setListed } from "./admin.ts";
+import { bulkVersions, reviewDecision, reviewFile, reviewPage, reviewQueue, setListed } from "./admin.ts";
+import { blocklistAction, bulkAccounts, bulkComments, logPage, moderationPage, reportAction, settingsAction, undoAction, userAction, userPage } from "./moderation-admin.ts";
+import { passedTurnstile, report, TURNSTILE_FAILED, TURNSTILE_ORIGIN, turnstileOn, turnstileWidget } from "./moderation.ts";
 
 export interface Env {
   DB: D1Database;
@@ -71,6 +73,12 @@ export interface Env {
   COOKIE_DOMAIN?: string;
   /** smtp2go API key for sending ticket email (a secret). */
   SMTP2GO_API_KEY?: string;
+  /** Cloudflare Turnstile on sign-up, tickets, uploads and new accounts' comments. Off unless both are set. */
+  TURNSTILE_SITE_KEY?: string;
+  /** A secret. */
+  TURNSTILE_SECRET?: string;
+  /** Keys the network hashes moderation keeps (a secret), so they can't be reversed by guessing addresses. */
+  IP_HASH_KEY?: string;
 }
 
 function securityHeaders(env: Env, loopbackForm = false): Record<string, string> {
@@ -78,9 +86,11 @@ function securityHeaders(env: Env, loopbackForm = false): Record<string, string>
   const viewer = new URL(viewerUrl(env)).origin;
   // The app sign-in page's form answers Blockwork on this computer.
   const formAction = loopbackForm ? "'self' http://127.0.0.1:*" : "'self'";
+  // Turnstile's widget is a script and a frame from Cloudflare.
+  const challenge = turnstileOn(env) ? ` ${TURNSTILE_ORIGIN}` : "";
   return {
     "Content-Security-Policy":
-      `default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' https:; font-src 'self'; connect-src 'self'; frame-src ${viewer}; form-action ${formAction}; frame-ancestors 'none'; base-uri 'none'`,
+      `default-src 'none'; script-src 'self'${challenge}; style-src 'unsafe-inline'; img-src 'self' https:; font-src 'self'; connect-src 'self'; frame-src ${viewer}${challenge}; form-action ${formAction}; frame-ancestors 'none'; base-uri 'none'`,
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "same-origin",
   };
@@ -100,6 +110,11 @@ export default {
       env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(Date.now()),
       env.DB.prepare("DELETE FROM app_codes WHERE expires_at <= ?").bind(Date.now()),
       env.DB.prepare("DELETE FROM username_history WHERE hold_until <= ?").bind(Date.now()),
+      // Network hashes are kept 90 days, long enough to spot a returning spammer.
+      env.DB.prepare("UPDATE comments SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at <= ?").bind(Date.now() - 90 * 86400_000),
+      env.DB.prepare("UPDATE versions SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND submitted_at <= ?").bind(Date.now() - 90 * 86400_000),
+      env.DB.prepare("UPDATE tickets SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at <= ?").bind(Date.now() - 90 * 86400_000),
+      env.DB.prepare("DELETE FROM blocklist WHERE expires_at IS NOT NULL AND expires_at <= ?").bind(Date.now()),
       env.DB.prepare("DELETE FROM email_changes WHERE expires_at <= ? OR auth_version != (SELECT auth_version FROM users WHERE id = email_changes.user_id)").bind(Date.now()),
     ]);
   },
@@ -212,6 +227,18 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
     if (!user) return message(user, admin, tp("Not found"), tp("That comment doesn't exist."), 404);
     return deleteComment(env, user, admin, Number(m[1]));
   }
+  if (method === "POST" && (m = path.match(/^\/(comments|packs)\/([^/]{1,400})\/report$/))) {
+    if (!user) return new Response(null, { status: 303, headers: { Location: "/login" } });
+    let id = "";
+    try {
+      id = decodeURIComponent(m[2]);
+    } catch {}
+    const kind = m[1] === "comments" ? "comment" : "pack";
+    if (kind === "comment" && !/^\d{1,12}$/.test(id)) return message(user, admin, tp("Not found"), tp("There's nothing here."), 404);
+    const result = await report(env, req, user, kind, id, String((await req.formData()).get("reason") ?? ""));
+    if ("error" in result) return message(user, admin, tp("Couldn't report that"), result.error, result.status);
+    return message(user, admin, tp("Thanks for the report"), tp("We'll take a look. Reports stay private."));
+  }
   if (path === "/app/login") {
     if (method === "GET") return appLoginPage(user, url);
     if (method === "POST") return appLoginConfirm(req, env, user);
@@ -226,7 +253,7 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
   if (path === "/submit" || path === "/me") {
     if (!user) return new Response(null, { status: 302, headers: { Location: `/login?next=${encodeURIComponent(path)}` } });
     if (path === "/me") return myPacks(env, user, admin);
-    return method === "POST" ? submit(req, env, user, admin) : submitForm(user, admin);
+    return method === "POST" ? submit(req, env, user, admin) : submitForm(env, user, admin);
   }
 
   if (path.startsWith("/admin")) {
@@ -237,11 +264,26 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
     if (method === "POST" && (m = path.match(/^\/admin\/versions\/(\d+)\/redraw$/))) return redraw(env, Number(m[1]));
     if (method === "POST" && (m = path.match(/^\/admin\/versions\/(\d+)\/renders$/))) return saveRenders(req, env, Number(m[1]));
     if ((m = path.match(/^\/admin\/versions\/(\d+)$/))) {
-      return method === "POST" ? reviewDecision(req, env, Number(m[1])) : reviewPage(env, user, admin, Number(m[1]), url.searchParams);
+      return method === "POST" ? reviewDecision(req, env, Number(m[1]), user) : reviewPage(env, user, admin, Number(m[1]), url.searchParams);
     }
     if (method === "GET" && (m = path.match(/^\/admin\/versions\/(\d+)\/file$/))) return reviewFile(env, Number(m[1]));
-    if (method === "POST" && (m = path.match(/^\/admin\/packs\/([^/]+)$/))) return setListed(req, env, decodeURIComponent(m[1]));
-    if (method === "POST" && (m = path.match(/^\/admin\/users\/([^/]+)$/))) return setBanned(req, env, decodeURIComponent(m[1]));
+    if (method === "POST" && (m = path.match(/^\/admin\/packs\/([^/]+)$/))) return setListed(req, env, decodeURIComponent(m[1]), user);
+    if (method === "POST" && path === "/admin/versions") return bulkVersions(req, env, user);
+    if (method === "GET" && path === "/admin/moderation") return moderationPage(env, user);
+    if (method === "POST" && path === "/admin/moderation/comments") return bulkComments(req, env, user);
+    if (method === "POST" && path === "/admin/moderation/accounts") return bulkAccounts(req, env, user);
+    if (method === "POST" && path === "/admin/moderation/settings") return settingsAction(req, env, user);
+    if (method === "POST" && path === "/admin/moderation/blocklist") return blocklistAction(req, env, user);
+    if (method === "GET" && path === "/admin/moderation/log") return logPage(env, user);
+    if (method === "POST" && (m = path.match(/^\/admin\/moderation\/log\/(\d+)\/undo$/))) return undoAction(env, user, Number(m[1]));
+    if (method === "POST" && (m = path.match(/^\/admin\/reports\/(\d+)$/))) return reportAction(req, env, user, Number(m[1]));
+    if ((m = path.match(/^\/admin\/users\/([^/]+)$/))) {
+      let id = "";
+      try {
+        id = decodeURIComponent(m[1]);
+      } catch {}
+      return method === "POST" ? userAction(req, env, user, id) : userPage(env, user, id);
+    }
   }
   return message(user, admin, tp("Not found"), tp("There's nothing here."), 404);
 }
@@ -292,7 +334,7 @@ function png(base64: string): Response {
   return new Response(bytes, { headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" } });
 }
 
-function submitForm(user: User, admin: boolean, error = ""): Response {
+function submitForm(env: Env, user: User, admin: boolean, error = ""): Response {
   return page(tp("Submit a pack"),
     user,
     admin,
@@ -306,6 +348,7 @@ function submitForm(user: User, admin: boolean, error = ""): Response {
      Packs shouldn't run commands, go online, write files or read secrets unless that's plainly their purpose.</p>
      <form method="post" enctype="multipart/form-data">
        <p><input type="file" name="pack" accept=".blockpack,.json,application/json" required></p>
+       ${admin ? "" : turnstileWidget(env)}
        <p><button class="primary">Submit for review</button></p>
      </form>`,
     error ? 400 : 200,
@@ -313,11 +356,13 @@ function submitForm(user: User, admin: boolean, error = ""): Response {
 }
 
 async function submit(req: Request, env: Env, user: User, admin: boolean): Promise<Response> {
-  if (user.banned) return submitForm(user, admin, "This account can't submit packs.");
-  const file = (await req.formData()).get("pack");
-  if (!file || typeof file === "string") return submitForm(user, admin, "Pick a pack file to upload.");
-  const result = await acceptUpload(env, user, new Uint8Array(await file.arrayBuffer()));
-  if ("error" in result) return submitForm(user, admin, result.error);
+  if (user.banned) return submitForm(env, user, admin, "This account can't submit packs.");
+  const form = await req.formData();
+  if (!admin && !(await passedTurnstile(env, req, form.get("cf-turnstile-response")))) return submitForm(env, user, admin, TURNSTILE_FAILED);
+  const file = form.get("pack");
+  if (!file || typeof file === "string") return submitForm(env, user, admin, "Pick a pack file to upload.");
+  const result = await acceptUpload(env, req, user, new Uint8Array(await file.arrayBuffer()));
+  if ("error" in result) return submitForm(env, user, admin, result.error);
   return new Response(null, { status: 303, headers: { Location: "/me" } });
 }
 

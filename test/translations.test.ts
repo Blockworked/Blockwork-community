@@ -10,6 +10,8 @@ const user: User = {id:'local:translator-1',name:'Translator <one>',avatar:'',ba
 const language = {code:'ar',name:'Arabic',direction:'rtl',plural:{number:6,formula:'n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5'}};
 function setup() {
   const f = fixture();
+  // Saves pass the spam checks, which need the account to exist.
+  f.sql.prepare('INSERT INTO users (id, name, created_at, public_id) VALUES (?, ?, ?, ?)').run(user.id, user.name, Date.now() - 30 * 86400_000, 'translator1');
   Object.assign(f.env,{WEBLATE_URL:'https://weblate.example.com',WEBLATE_COMPONENTS:'blockwork/ui',WEBLATE_READ_TOKEN:'read-only-secret',WEBLATE_SHARED_SECRET:'s'.repeat(64)});
   const translation = {language,total:10,translated:2,translated_percent:20,fuzzy:1,is_source:false};
   const unit: Unit = {id:42,source:['%n block','%n blocks'],target:['','','','','',''],state:0,content_hash:'original',context:'Editor',note:'<script>unsafe</script>',explanation:'',location:'Editor.qml:12',flags:'',translation:'https://weblate.example.com/api/translations/blockwork/ui/ar/',has_failing_check:false};

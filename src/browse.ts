@@ -9,6 +9,7 @@ import { blockView, CAPABILITIES, OFFICIAL_OWNER } from "./packs.ts";
 import { highlightJson, packSource } from "./source.ts";
 import { backgroundRenders, blockPicture, blockPictures, viewer } from "./renders.ts";
 import { commentsSection } from "./comments.ts";
+import { VISIBLE_COMMENT } from "./moderation.ts";
 
 export interface VersionRow {
   id: number;
@@ -45,7 +46,7 @@ export interface ListedPack extends VersionRow {
 const LISTED = `SELECT v.*, u.name AS author, u.public_id AS author_public_id, u.username AS author_username, u.avatar AS author_avatar,
        p.owner_id AS owner_id, p.created_at AS pack_created_at,
        (SELECT COUNT(*) FROM comments c JOIN users cu ON cu.id = c.user_id
-        WHERE c.pack_id = p.id AND c.deleted_at IS NULL AND cu.banned = 0 AND cu.deactivated_at = 0 AND cu.deleted_at = 0) AS comments
+        WHERE c.pack_id = p.id AND ${VISIBLE_COMMENT}) AS comments
      FROM versions v JOIN packs p ON p.id = v.pack_id JOIN users u ON u.id = p.owner_id
      WHERE p.listed = 1 AND u.banned = 0 AND u.deactivated_at = 0 AND u.deleted_at = 0
        AND v.id = (SELECT MAX(id) FROM versions WHERE pack_id = p.id AND status = 'approved')`;
@@ -301,7 +302,13 @@ export async function packPage(env: Env, user: User | null, admin: boolean, id: 
      <h2>${tn("{n} block", "{n} blocks", blocks.length)}</h2><ul class="block-list">${blockList}</ul>
      <p class="see-how"><a href="/packs/${encodeURIComponent(p.pack_id)}/source">${t('See how they work')}</a></p>
      <h2>${t('Versions')}</h2><ul class="versions">${versionList}</ul>
-     ${await commentsSection(env, user, admin, p, error, draft)}${await backgroundRenders(env, admin)}`,
+     ${await commentsSection(env, user, admin, p, error, draft)}
+     ${user && !user.banned && user.id !== p.owner_id ? `<details class="report"><summary class="muted">${t('Report this pack')}</summary>
+       <form method="post" action="/packs/${encodeURIComponent(p.pack_id)}/report"><p><select name="reason" aria-label="${t('Reason')}">
+         <option value="Spam">${t('Spam')}</option><option value="Harmful or malicious">${t('Harmful or malicious')}</option>
+         <option value="Copied from someone else">${t('Copied from someone else')}</option><option value="Something else">${t('Something else')}</option></select>
+         <button>${t('Report')}</button></p></form></details>` : ""}
+     ${await backgroundRenders(env, admin)}`,
   );
 }
 

@@ -1,6 +1,7 @@
 import { translationSite, translationPath, translationLink, translationLogin } from './translation-site.ts';
 import { isAdmin, type User } from './auth.ts';
 import { boundedBody, limit } from './account-security.ts';
+import { screen } from './moderation.ts';
 import type { Env } from './index.ts';
 import { esc, page, type Shell } from './pages.ts';
 import { t, tn, tp, raw } from './i18n.ts';
@@ -121,8 +122,16 @@ export async function translateRoute(req: Request, env: Env, user: User | null):
     const notice = done === 'proposed' ? tp('Thanks. Your request is listed below, and the team has been told.') : done === 'joined' ? tp('Someone already asked for that language, so you’ve been added to it.') : done === 'added' ? tp('Language added.') : done === 'declined' ? tp('Request declined.') : '';
     return proposalsPage(env, user, isAdmin(env, user), view, notice);
   }
+  // Every write here passes the same spam checks as the community site's.
+  const refused = async (action: 'language' | 'translation') => {
+    if (isAdmin(env, user)) return null;
+    const verdict = await screen(env, req, user!, action);
+    // A shadowbanned account's translation work isn't sent on.
+    const error = !verdict.ok ? verdict.error : verdict.hidden ? tp("That's a lot in a short time. Try again later.") : '';
+    return error ? view(tp('Try again later'), `<h1>${t('Try again later')}</h1><p>${esc(error)}</p>`, verdict.ok ? 429 : verdict.status) : null;
+  };
   if (path === `${ROOT}/languages/new`) {
-    if (req.method === 'POST') return proposeLanguage(env, user!, submitted!, view);
+    if (req.method === 'POST') return (await refused('language')) ?? proposeLanguage(env, user!, submitted!, view);
     return proposalForm(env, user, view);
   }
   const proposal = /^\/translate\/languages\/([1-9]\d{0,9})$/.exec(path);
@@ -139,7 +148,7 @@ export async function translateRoute(req: Request, env: Env, user: User | null):
     if (!tr) throw new WeblateError(404);
     const v = viewOf(url);
     if (match![4]) return await stringList(env, user, component, tr, v);
-    if (req.method === 'POST') return await act(env, user!, component, tr, v, submitted!);
+    if (req.method === 'POST') return (await refused('translation')) ?? await act(env, user!, component, tr, v, submitted!);
     return await editorAt(env, user, component, tr, v, notice(url));
   } catch (error) {
     if (!(error instanceof WeblateError)) throw error;
