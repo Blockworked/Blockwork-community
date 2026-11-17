@@ -106,7 +106,7 @@ async function list<T>(env: Env, path: string): Promise<T[]> {
 export async function otherLanguages(env: Env, unit: Unit): Promise<Unit[]> {
   const source = idFrom(env, unit.source_unit, 'units');
   if (!source) return [];
-  return (await list<Unit>(env, `/api/units/${source}/translations/`)).filter(u => u.id !== unit.id && u.target.some(Boolean));
+  return (await list<Unit>(env, `/api/units/${source}/translations/`)).filter(u => u.id !== unit.id && Array.isArray(u.target) && u.target.some(Boolean));
 }
 export function suggestions(env: Env, unit: number): Promise<Suggestion[]> { return list<Suggestion>(env, `/api/units/${unit}/suggestions/?page_size=50`); }
 export function comments(env: Env, unit: number): Promise<Comment[]> { return list<Comment>(env, `/api/units/${unit}/comments/?page_size=50`); }

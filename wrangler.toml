@@ -17,7 +17,8 @@ routes = [
 TRANSLATE_URL = "https://translate.blockworked.com"
 # Translation backend: set after installing ops/weblate/blockworked_auth.py (docs/translations.md).
 WEBLATE_URL = "https://weblate.blockworked.com"
-WEBLATE_COMPONENTS = "blockwork/ui"
+# Components missing on Weblate are left off the project list.
+WEBLATE_COMPONENTS = "blockwork/ui,blockworked/website,blockworked/community"
 WEBLATE_TRANSLATION_LICENSE = "GPL-3.0-only"
 # Set WEBLATE_READ_TOKEN and WEBLATE_SHARED_SECRET as Worker secrets.
 # Set a positive number to restore the username change delay.

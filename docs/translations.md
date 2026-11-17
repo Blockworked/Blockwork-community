@@ -6,13 +6,62 @@ site theme. Weblate remains responsible for files, quality checks, permissions,
 history and GitHub pull requests. No translation database is duplicated here.
 
 The editor supports singular strings, every target-language plural form, RTL,
-context, notes, skip, review-all, keyboard save, and a completion screen. It
+context, notes, skip, review-all, keyboard save, and a completion screen.
+Translators also get: a string list per language (50 a page) with filters for
+untranslated, needs editing, has suggestions, has comments, failing checks and
+translated, plus search over source, translation, context and notes; previous
+and next string (Alt+Left/Right); placeholder chips that insert at the caret and
+a warning when one is missing; Copy English; the glossary's terms found in the
+string (`<project>/glossary`, when the project has one); the source string's
+screenshots, proxied through the Worker; the same string in other languages;
+suggestions with voting and "use this"; comments (translation, source-string
+issue or report); a "needs editing" box; and "Suggest instead" for people unsure
+of a translation. It
 preserves drafts after failed saves and detects a source or target that changed
 since the page was loaded. This last comparison is a best-effort check immediately
 before PATCH, not a database transaction spanning the two services. Existing
 Weblate reviews remain in Weblate; the contributor UI saves state 20 (translated),
 never state 30 (approved). Translation files reach the app through the existing
 review/release process.
+
+## Projects
+
+Three components are exposed: `blockwork/ui` (the app), `blockworked/website`
+(blockworked.com, `locales/website.pot` in Blockworked/blockworked.com) and
+`blockworked/community` (this site, `locales/community.pot`). Both sites are
+gettext: the English text is the message id, `npm run i18n:extract` (here) or
+`pnpm i18n:extract` (blockworked.com) rewrites the template, and each build
+compiles `locales/*.po` and fails while the template is stale. A language
+appears on a site once half its strings are translated, and the `bw-lang`
+cookie on `blockworked.com` carries the visitor's choice between the two.
+Components that don't exist on Weblate yet are left off the project list.
+
+Create the Weblate side once, with an administrator token used only for the run:
+
+```bash
+WEBLATE_URL=https://weblate.blockworked.com WEBLATE_ADMIN_TOKEN=... \
+  python3 ops/weblate/setup_site_projects.py --translators 8 --reader 9
+```
+
+It creates project `blockworked` and both components (gettext PO,
+`locales/*.po`, new languages from the template), copies the repository push
+settings from `blockwork/ui`, adds the msgmerge add-on, turns suggestion voting
+on for all three components, and adds the project to both teams. If either team
+selects components rather than projects, add the two new components to it in
+Weblate's team settings instead. Then add both components to
+`BLOCKWORKED_COMPONENTS` (below) and restart Weblate.
+
+## Language requests
+
+Anyone signed in can ask for a language at `/languages/new` (a Weblate code
+such as `pt_BR`, a name and why); others add their support to an open request,
+five requests a day per account. Requests are kept in D1
+(`language_proposals`, `language_supporters`) and admins are notified. An admin
+adds a request, which creates that translation in every exposed component, or
+declines it with a reply. Adding needs `WEBLATE_LANGUAGE_TOKEN` (below): a
+token for an account with **Add new language** on the exposed projects and
+nothing else. Without it, add the language in Weblate and then mark the request
+added.
 
 ## Configure the Worker
 
@@ -21,7 +70,7 @@ Add these variables to `wrangler.toml`'s `[vars]` or `.dev.vars` for local work:
 ```toml
 TRANSLATE_URL = "https://translate.blockworked.com"
 WEBLATE_URL = "https://weblate-backend.example.com"
-WEBLATE_COMPONENTS = "blockwork/ui"
+WEBLATE_COMPONENTS = "blockwork/ui,blockworked/website,blockworked/community"
 WEBLATE_TRANSLATION_LICENSE = "GPL-3.0-only"
 ```
 
@@ -37,6 +86,7 @@ Set Worker secrets through Wrangler, never in source control:
 ```bash
 npx wrangler secret put WEBLATE_READ_TOKEN
 npx wrangler secret put WEBLATE_SHARED_SECRET
+npx wrangler secret put WEBLATE_LANGUAGE_TOKEN   # optional, for language requests
 ```
 
 `WEBLATE_READ_TOKEN` belongs to a dedicated Weblate account with only **View
@@ -77,7 +127,7 @@ Weblate administration/login is unchanged.
    import os
 
    BLOCKWORKED_SHARED_SECRET = os.environ["BLOCKWORKED_SHARED_SECRET"]
-   BLOCKWORKED_COMPONENTS = ["blockwork/ui"]
+   BLOCKWORKED_COMPONENTS = ["blockwork/ui", "blockworked/website", "blockworked/community"]
    BLOCKWORKED_TRANSLATOR_GROUP_ID = 123  # actual team ID
    REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"] = (
        "blockworked_auth.SignedBlockworkedAuthentication",
@@ -119,8 +169,13 @@ installed Weblate version.
 
 Every saved edit carries an HMAC over timestamp, random nonce, UTF-8 public
 identity, HTTP method, exact path, and SHA-256 body hash. Requests expire after
-60 seconds and nonces are single-use. Only `PATCH /api/units/<id>/` with exactly
-`target` and translated state 20 is accepted. The adapter independently checks
+60 seconds and nonces are single-use. Only three writes are accepted:
+`PATCH /api/units/<id>/` with exactly `target` and state 20 (translated) or 10
+(needs editing), `POST /api/units/<id>/suggestions/` with exactly `target` (an
+existing suggestion's text counts as a vote), and `POST
+/api/units/<id>/comments/` with exactly `scope` (`translation`, `global` or
+`report`) and a 1-1000 character `comment`. Approving, accepting or deleting a
+suggestion stays in Weblate. The adapter independently checks
 its own component allowlist before creating or selecting a contributor.
 
 Contributor usernames derive from the immutable Blockworked account ID, never
@@ -198,7 +253,10 @@ by Cloudflare: its remote ingress configuration is authoritative. Keep the local
 `~/nextcloud/cloudflared/config.yml` synchronized for recovery. Both backend and
 original translation host ingress rules remain available for rollback.
 
-The `Blockworked translators` team (ID 8) grants Translate on `blockwork/ui` only.
+The `Blockworked translators` team (ID 8) grants Translate on `blockwork/ui` only,
+until `setup_site_projects.py` adds the sites' project. The adapter on the
+server must also be replaced with the current file, which accepts suggestions,
+votes and comments; the older one refuses them, so those buttons fail until then.
 The reader account belongs only to `Blockworked UI reader` (ID 9), with no edit
 role. Newly mapped contributors have Weblate's automatic default team memberships
 replaced by the dedicated translator team. Native Weblate administration remains

@@ -51,7 +51,7 @@ export const TRANSLATE_CSS = `
 .translation-find .search input { font-size: 13px; padding: 7px 10px 7px 34px; }
 .translation-find select, .translation-actions select { font: inherit; font-size: 13px; padding: 0 8px; min-height: 32px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg2); color: var(--fg); }
 /* The string list: English and the translation side by side, split by hairlines. */
-.strings a { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: baseline; gap: 4px 20px; }
+.strings a { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 15rem; align-items: baseline; gap: 4px 20px; }
 .string-source, .string-target { overflow-wrap: anywhere; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .string-state { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 10px; }
 .string-flag { font-size: 12px; color: var(--muted); }
