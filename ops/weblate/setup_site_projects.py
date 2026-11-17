@@ -2,11 +2,12 @@
 """Create the Weblate project for the two Blockworked sites and wire it up.
 
 Makes project `blockworked` with components `website` (Blockworked/blockworked.com,
-locales/website.pot) and `community` (Blockworked/Blockwork-community-blocks,
+locales/website.pot) and `community` (Blockworked/Blockwork-community,
 locales/community.pot), copying the repository push settings from blockwork/ui,
 adds the msgmerge add-on so each .po follows its template, turns on suggestion
-voting, and gives the contributor team Translate and the reader team View on the
-new project. Safe to run again: whatever already exists is left as it is.
+voting, and adds both components to the contributor and reader teams. Those
+teams list components, and Weblate then grants their role on those components
+only, never on their projects. Safe to run again: whatever already exists is left as it is.
 
     WEBLATE_URL=https://weblate.blockworked.com WEBLATE_ADMIN_TOKEN=... \\
       python3 ops/weblate/setup_site_projects.py --translators 8 --reader 9
@@ -24,7 +25,7 @@ PROJECT = {'name': 'Blockworked sites', 'slug': 'blockworked', 'web': 'https://b
 COMPONENTS = [
     {'name': 'blockworked.com', 'slug': 'website', 'repo': 'https://github.com/Blockworked/blockworked.com.git',
      'template': 'locales/website.pot'},
-    {'name': 'Community site', 'slug': 'community', 'repo': 'https://github.com/Blockworked/Blockwork-community-blocks.git',
+    {'name': 'Community site', 'slug': 'community', 'repo': 'https://github.com/Blockworked/Blockwork-community.git',
      'template': 'locales/community.pot'},
 ]
 # Repository settings taken from the app's component so the sites push the same way.
@@ -67,7 +68,6 @@ def main():
         if status not in (200, 201):
             sys.exit(f'Could not create the project ({status}): {body}')
         print('created project', PROJECT['slug'])
-    project_id = body['id']
 
     for component in COMPONENTS:
         path = f"/api/components/{PROJECT['slug']}/{component['slug']}/"
@@ -95,9 +95,11 @@ def main():
         status, body = call(base, token, 'PATCH', path, {'suggestion_voting': True})
         print('suggestion voting', path, status)
 
-    for team in (args.translators, args.reader):
-        status, body = call(base, token, 'POST', f'/api/groups/{team}/projects/', {'project_id': project_id})
-        print('team', team, 'gets project', PROJECT['slug'], status)
+    for component in COMPONENTS:
+        status, body = call(base, token, 'GET', f"/api/components/{PROJECT['slug']}/{component['slug']}/")
+        for team in (args.translators, args.reader):
+            status, _ = call(base, token, 'POST', f'/api/groups/{team}/components/', {'component_id': body['id']})
+            print('team', team, 'gets', component['slug'], status)
     print('Now add', ', '.join(f"{PROJECT['slug']}/{c['slug']}" for c in COMPONENTS),
           'to BLOCKWORKED_COMPONENTS on Weblate and WEBLATE_COMPONENTS in wrangler.toml.')
 

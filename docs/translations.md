@@ -46,10 +46,13 @@ WEBLATE_URL=https://weblate.blockworked.com WEBLATE_ADMIN_TOKEN=... \
 It creates project `blockworked` and both components (gettext PO,
 `locales/*.po`, new languages from the template), copies the repository push
 settings from `blockwork/ui`, adds the msgmerge add-on, turns suggestion voting
-on for all three components, and adds the project to both teams. If either team
-selects components rather than projects, add the two new components to it in
-Weblate's team settings instead. Then add both components to
-`BLOCKWORKED_COMPONENTS` (below) and restart Weblate.
+on for all three components, and adds both components to both teams. The teams
+list components, and Weblate 6 then grants their role on those components only
+and ignores their projects, so a component must be listed to be translatable.
+Then add both components to `BLOCKWORKED_COMPONENTS` (below) and restart
+Weblate. Each site repository needs the same push webhook as Blockwork's
+(`https://translate.blockworked.com/hooks/github/`, JSON, push events) so new
+strings reach Weblate.
 
 ## Language requests
 
@@ -253,10 +256,12 @@ by Cloudflare: its remote ingress configuration is authoritative. Keep the local
 `~/nextcloud/cloudflared/config.yml` synchronized for recovery. Both backend and
 original translation host ingress rules remain available for rollback.
 
-The `Blockworked translators` team (ID 8) grants Translate on `blockwork/ui` only,
-until `setup_site_projects.py` adds the sites' project. The adapter on the
-server must also be replaced with the current file, which accepts suggestions,
-votes and comments; the older one refuses them, so those buttons fail until then.
+Since 2026-11-17 the `Blockworked translators` team (ID 8) grants Translate on
+`blockwork/ui`, `blockworked/website` and `blockworked/community` only; it and
+the reader team are site-wide teams (no defining project) listing those
+components. The server runs the adapter that accepts suggestions, votes and
+comments, with the previous files kept beside it as `*.bak-20261117`. Both site
+repositories have the push webhook.
 The reader account belongs only to `Blockworked UI reader` (ID 9), with no edit
 role. Newly mapped contributors have Weblate's automatic default team memberships
 replaced by the dedicated translator team. Native Weblate administration remains
