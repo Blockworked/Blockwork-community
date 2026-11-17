@@ -185,8 +185,10 @@ export async function acceptUpload(
   if (typeof bytes === "string") return { error: bytes };
   const sha = await sha256Hex(bytes);
 
-  if (await env.DB.prepare("SELECT 1 FROM versions WHERE sha256 = ?").bind(sha).first()) {
-    return { error: "This exact file was already submitted." };
+  // A rejected file can be sent again; it reopens the same version row (sha256 is unique).
+  const earlier = await env.DB.prepare("SELECT id, status FROM versions WHERE sha256 = ?").bind(sha).first<{ id: number; status: string }>();
+  if (earlier && earlier.status !== "rejected") {
+    return { error: earlier.status === "pending" ? "This exact file is already waiting for review." : "This exact file was already approved." };
   }
   const pack = await env.DB.prepare("SELECT owner_id, listed FROM packs WHERE id = ?").bind(meta.id).first<{ owner_id: string; listed: number }>();
   if (pack && pack.owner_id !== user.id) {
@@ -200,10 +202,14 @@ export async function acceptUpload(
     env.DB.prepare(
       "UPDATE versions SET status = 'rejected', reason = 'Replaced by a newer upload', reviewed_at = ? WHERE pack_id = ? AND status = 'pending'",
     ).bind(now, meta.id),
-    env.DB.prepare(
-      `INSERT INTO versions (pack_id, sha256, name, description, version, blocks, block_views, capabilities, status, submitted_by, submitted_at, ip_hash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
-    ).bind(meta.id, sha, meta.name, meta.description, meta.version, JSON.stringify(meta.blocks), JSON.stringify(meta.views), JSON.stringify(meta.capabilities), user.id, now, verdict.ipHash),
+    earlier
+      ? env.DB.prepare(
+          "UPDATE versions SET status = 'pending', reason = '', reviewed_at = NULL, submitted_by = ?, submitted_at = ?, ip_hash = ? WHERE id = ? AND status = 'rejected'",
+        ).bind(user.id, now, verdict.ipHash, earlier.id)
+      : env.DB.prepare(
+          `INSERT INTO versions (pack_id, sha256, name, description, version, blocks, block_views, capabilities, status, submitted_by, submitted_at, ip_hash)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
+        ).bind(meta.id, sha, meta.name, meta.description, meta.version, JSON.stringify(meta.blocks), JSON.stringify(meta.views), JSON.stringify(meta.capabilities), user.id, now, verdict.ipHash),
   ];
   if (!pack) {
     statements.unshift(env.DB.prepare("INSERT INTO packs (id, owner_id, created_at) VALUES (?, ?, ?)").bind(meta.id, user.id, now));
@@ -213,7 +219,7 @@ export async function acceptUpload(
     ? await env.DB.prepare("SELECT 1 FROM versions WHERE pack_id = ? AND status = 'approved' LIMIT 1").bind(meta.id).first()
     : null;
   const saved = await env.DB.batch(statements);
-  const versionId = saved[saved.length - 1].meta.last_row_id;
+  const versionId = earlier ? earlier.id : saved[saved.length - 1].meta.last_row_id;
   // A shadowbanned account's uploads wait in their own corner of the queue, unannounced.
   if (!verdict.hidden) await notify(env, { title: `Pack submission: ${meta.name}`, text: `${user.name} submitted ${meta.name} (${meta.version}) for review.`, url: `${env.SITE_URL}/admin/versions/${versionId}` });
   return { meta, sha, update: !!listed };
