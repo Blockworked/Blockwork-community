@@ -18,7 +18,7 @@ test('Blockworked contributor browses languages, signs saves, and retains failed
   const languages=[{code:'fr',name:'French',direction:'ltr',plural:{number:2,formula:'n > 1'}},{code:'ar',name:'Arabic',direction:'rtl',plural:{number:6,formula:'n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5'}}];
   const unit={id:42,source:['Open project'],target:[''],state:0,content_hash:'original',context:'Welcome screen',note:'Button label',explanation:'',location:'Welcome.qml:42',flags:'',translation:'https://weblate.example.com/api/translations/blockwork/ui/fr/',has_failing_check:false};
   let saves=0, failSave=false;
-  const options={rootPath:build,modulesRoot:build,modules:[{type:'ESModule',path:join(build,'index.js')}],compatibilityDate:'2026-10-01',d1Databases:['DB'],r2Buckets:['PACKS'],
+  const options={rootPath:build,modulesRoot:build,modules:[{type:'ESModule',path:join(build,'index.js')}],compatibilityDate:'2026-10-01',compatibilityFlags:['nodejs_als'],d1Databases:['DB'],r2Buckets:['PACKS'],
     bindings:{SITE_URL:'http://localhost',SUPPORT_URL:'http://localhost/support',ADMINS:'',LIBRARY_NAME:'Community',COOKIE_DOMAIN:'',WEBLATE_URL:'https://weblate.example.com',WEBLATE_COMPONENTS:'blockwork/ui',WEBLATE_READ_TOKEN:'read-secret',WEBLATE_SHARED_SECRET:secret},
     outboundService:async(req:Request)=>{
       const url=new URL(req.url);
@@ -84,8 +84,8 @@ test('Blockworked contributor browses languages, signs saves, and retains failed
     page.on('pageerror', e=>errors.push(e.message));
     await page.goto(translateOrigin+'/');
     await expect(page.getByRole('heading',{name:'Translations',exact:true,level:1})).toBeVisible();
-    await page.getByRole('link',{name:/Blockwork UI/}).click();
-    await expect(page.getByRole('heading',{name:'Blockwork UI',level:1})).toBeVisible();
+    await page.getByRole('link',{name:/Blockwork app/}).click();
+    await expect(page.getByRole('heading',{name:'Blockwork app',level:1})).toBeVisible();
     await page.getByRole('searchbox',{name:'Find a language'}).fill('fr');
     await expect(page.locator('[data-language="Arabic ar"]')).toBeHidden();
     await page.getByRole('link',{name:/French fr/}).click();
@@ -101,7 +101,6 @@ test('Blockworked contributor browses languages, signs saves, and retains failed
     await page.goto(signinUrl.searchParams.get('next')!);
     await page.reload();
     await expect(page.getByLabel('French',{exact:true})).toBeEnabled();
-    await page.getByText('Context and notes',{exact:true}).click();
     await expect(page.getByText('Welcome screen',{exact:true})).toBeVisible();
     await page.getByLabel('French',{exact:true}).fill('Ouvrir le projet');
     if(process.env.TRANSLATION_SCREENSHOT) await page.screenshot({path:process.env.TRANSLATION_SCREENSHOT,fullPage:true});
@@ -116,7 +115,7 @@ test('Blockworked contributor browses languages, signs saves, and retains failed
     await expect(page.getByRole('status')).toContainText('Translation saved');
     assert.equal(saves,1); assert.deepEqual(unit.target,['Ouvrir le projet']);
     await page.goto(translateOrigin+'/blockwork/ui/ar');
-    await expect(page.locator('textarea')).toHaveCount(6);
+    await expect(page.locator('#translation-form textarea')).toHaveCount(6);
     await expect(page.getByLabel('Plural form 1',{exact:true})).toHaveAttribute('dir','rtl');
     await page.setViewportSize({width:390,height:844});
     await expect(page.getByRole('button',{name:'Save and next'})).toBeVisible();

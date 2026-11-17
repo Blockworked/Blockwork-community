@@ -102,6 +102,33 @@ class AdapterTests(unittest.TestCase):
             with self.assertRaises(AuthenticationFailed): self.adapter.authenticate(self.request)
         self.users.objects.get_or_create.assert_not_called()
 
+    def use(self, method, path, data):
+        cache.clear()
+        body = json.dumps(data).encode()
+        self.request = types.SimpleNamespace(headers=signed(body=body, method=method, path=path), method=method, path=path, get_full_path=lambda: path, body=body, data=data)
+
+    def test_needs_editing_suggestions_and_comments_are_allowed(self):
+        for method, path, data in (('PATCH', '/api/units/42/', {'target':['Hallo'],'state':10}),
+                                   ('POST', '/api/units/42/suggestions/', {'target':['Hallo']}),
+                                   ('POST', '/api/units/42/comments/', {'scope':'report','comment':'Typo in the English'})):
+            self.use(method, path, data)
+            with self.subTest(path=path, data=data):
+                self.assertEqual(self.adapter.authenticate(self.request), (self.user, None))
+
+    def test_other_writes_on_suggestions_and_comments_are_rejected(self):
+        for method, path, data in (('POST', '/api/units/42/suggestions/', {'target':['Hallo'],'state':20}),
+                                   ('POST', '/api/units/42/suggestions/', {'target':[]}),
+                                   ('POST', '/api/units/42/comments/', {'scope':'global','comment':'x','user_email':'a@b.c'}),
+                                   ('POST', '/api/units/42/comments/', {'scope':'admin','comment':'x'}),
+                                   ('POST', '/api/units/42/comments/', {'scope':'global','comment':'x' * 1001}),
+                                   ('PATCH', '/api/units/42/suggestions/', {'target':['Hallo']}),
+                                   ('POST', '/api/suggestions/9/accept/', {'target':['Hallo']}),
+                                   ('POST', '/api/units/42/', {'target':['Hallo'],'state':20})):
+            self.use(method, path, data)
+            with self.subTest(method=method, path=path, data=data), self.assertRaises(AuthenticationFailed):
+                self.adapter.authenticate(self.request)
+        self.users.objects.get_or_create.assert_not_called()
+
     def test_disabled_or_colliding_accounts_cannot_authenticate(self):
         for field, value in (('is_active',False),('is_superuser',True),('email','someone@example.com')):
             cache.clear()

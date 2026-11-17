@@ -54,7 +54,8 @@ test('configured projects and language picker use the existing shell and omit so
   const f=setup(); try {
     const home=await f.request('/translate'); const html=await home.text();
     assert.match(html,/<h1>Translations<\/h1>/); assert.match(html,/Blockworked Translations/);
-    assert.equal(f.calls.length,0);
+    assert.match(html,/Blockwork app/); assert.match(html,/1 language/);
+    assert.ok(f.calls.every(c=>c.url.pathname==='/api/components/blockwork/ui/translations/'));
     const response=await f.request('/translate/blockwork/ui'); const body=await response.text();
     assert.match(body,/Arabic/); assert.doesNotMatch(body,/data-language="English/);
     assert.match(body,/2 \/ 10 translated/);

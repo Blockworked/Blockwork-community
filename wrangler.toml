@@ -1,6 +1,8 @@
 name = "blockwork-library"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
+# AsyncLocalStorage carries each request's language (src/i18n.ts).
+compatibility_flags = ["nodejs_als"]
 # Blockworked domains share account cookies; OAuth callbacks stay on the community host.
 workers_dev = false
 routes = [

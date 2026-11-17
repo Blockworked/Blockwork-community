@@ -3,16 +3,23 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/i18n.mjs compile",
     "dev": "wrangler dev",
+    "predeploy": "node scripts/i18n.mjs compile",
     "deploy": "wrangler deploy",
     "migrate:local": "wrangler d1 migrations apply DB --local",
     "migrate:remote": "wrangler d1 migrations apply DB --remote",
     "seed:local": "node scripts/seed.js --local",
     "seed:remote": "node scripts/seed.js --remote",
+    "pretypecheck": "node scripts/i18n.mjs compile",
     "typecheck": "tsc --noEmit",
+    "pretest": "node scripts/i18n.mjs compile",
     "test": "node --test test/*.test.ts",
     "test:runtime": "python3 scripts/test-pack-runtime.py",
-    "test:browser": "node --test test-browser/*.test.ts"
+    "pretest:browser": "node scripts/i18n.mjs compile",
+    "test:browser": "node --test test-browser/*.test.ts",
+    "i18n:extract": "node scripts/i18n.mjs extract",
+    "i18n:check": "node scripts/i18n.mjs check"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261019.1",

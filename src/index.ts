@@ -4,6 +4,7 @@
 import { webLateGithubHook } from './weblate-hooks.ts';
 import { translationSite, translationLink } from './translation-site.ts';
 import { translateRoute } from './translate.ts';
+import { inLanguage, negotiate, tp } from './i18n.ts';
 import { cleanupAccountObjects } from './account-lifecycle.ts';
 import { profilePicture } from './profile.ts';
 import { AuthBusyError } from "./account-security.ts";
@@ -34,6 +35,8 @@ export interface Env {
   /** Read-only project-scoped token and HMAC signing key: Worker secrets. */
   WEBLATE_READ_TOKEN?: string;
   WEBLATE_SHARED_SECRET?: string;
+  /** A Weblate token allowed only to add languages to the listed components. */
+  WEBLATE_LANGUAGE_TOKEN?: string;
   /** Enable only after migration, verified mail sender and adequate Workers CPU are configured. */
   LOCAL_AUTH_ENABLED?: string;
   AUTH_FROM?: string;
@@ -104,17 +107,20 @@ export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     setMainSite(env.MAIN_SITE_URL, supportUrl(env), translationSite(env).href);
     let res: Response;
+    const lang = negotiate(req);
     try {
-      res = await route(req, env, ctx);
+      res = await inLanguage(lang, () => route(req, env, ctx));
     } catch (e) {
-      if (e instanceof AuthBusyError) res = message(null, false, "Sign-in is busy", "Try again shortly.", 503);
+      if (e instanceof AuthBusyError) res = inLanguage(lang, () => message(null, false, tp("Sign-in is busy"), tp("Try again shortly."), 503));
       else {
         // Authentication requests can contain bearer secrets. Never log their URLs or bodies.
         console.error("Request failed");
-        res = message(null, false, "Something went wrong", "Try again in a moment.", 500);
+        res = inLanguage(lang, () => message(null, false, tp("Something went wrong"), tp("Try again in a moment."), 500));
       }
     }
     const headers = new Headers(res.headers);
+    // Pages follow the language cookie or the browser's languages.
+    if ((headers.get("Content-Type") ?? "").startsWith("text/html")) headers.append("Vary", "Cookie, Accept-Language");
     const loopbackForm = headers.has("X-Loopback-Form");
     headers.delete("X-Loopback-Form");
     for (const [k, v] of Object.entries(securityHeaders(env, loopbackForm))) headers.set(k, v);

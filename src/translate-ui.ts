@@ -43,6 +43,62 @@ export const TRANSLATE_CSS = `
 .translation-shortcut, .translation-credit { font-size: 13px; }
 .translation-shortcut kbd { font: inherit; font-weight: 600; color: var(--fg); }
 .translation-notice { color: var(--ok); font-size: 13px; font-weight: 600; margin: 0 0 12px; }
+.translation-meta-line { width: 100%; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.translation-tabs-end { margin-left: auto; }
+/* Search under the tabs: one row, wraps on phones. */
+.translation-find { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.translation-find .search { flex: 1 1 260px; }
+.translation-find .search input { font-size: 13px; padding: 7px 10px 7px 34px; }
+.translation-find select, .translation-actions select { font: inherit; font-size: 13px; padding: 0 8px; min-height: 32px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg2); color: var(--fg); }
+/* The string list: English and the translation side by side, split by hairlines. */
+.strings a { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: baseline; gap: 4px 20px; }
+.string-source, .string-target { overflow-wrap: anywhere; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.string-state { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 10px; }
+.string-flag { font-size: 12px; color: var(--muted); }
+.translation-pages { display: flex; justify-content: space-between; align-items: center; margin: 16px 0; font-size: 13px; }
+.translation-step { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 0 0 10px; font-size: 13px; }
+.translation-position { margin: 0; }
+.translation-step-links { display: flex; gap: 16px; margin-left: auto; }
+.translation-step-links a { color: var(--muted); }
+.translation-step-links a:hover { color: var(--fg); }
+.translation-source-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.translation-source-head button { min-height: 26px; font-size: 12px; }
+/* Placeholders are buttons: click one to put it at the cursor. */
+.ph { display: inline; min-height: 0; padding: 0 4px; margin: 0 1px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg3); color: var(--fg); font: 0.88em/1.4 var(--mono); vertical-align: 1px; white-space: pre; }
+.ph:disabled { cursor: default; }
+.translation-changed { font-size: 13px; color: var(--muted); border-top: 1px solid var(--glass-border); padding-top: 10px; margin: 12px 0 0; white-space: pre-wrap; }
+.translation-meta, .translation-glossary dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; margin: 12px 0; font-size: 13px; }
+.translation-meta dt, .translation-glossary dt { color: var(--muted); }
+.translation-glossary dt { color: var(--fg); font-weight: 600; }
+.translation-meta dd, .translation-glossary dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.translation-glossary { margin: 16px 0; }
+.translation-glossary h2, .translation-panel h2 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.translation-panel h2 .n, .translation-panel summary .n { font-weight: 400; }
+.translation-warning { color: var(--warn); font-size: 13px; margin: 8px 0 0; }
+:root[data-theme="light"] .translation-warning { color: #8a6a00; }
+.translation-check { display: flex !important; align-items: center; gap: 8px; font-weight: 400 !important; color: var(--muted); }
+.translation-check input { margin: 0; }
+.translation-panel { margin: 28px 0 0; padding-top: 16px; border-top: 1px solid var(--glass-border); }
+.translation-panel summary { cursor: pointer; list-style: none; }
+.translation-panel summary::-webkit-details-marker { display: none; }
+.translation-panel summary h2 { display: inline; }
+.translation-panel summary h2::after { content: " +"; }
+.translation-panel details[open] summary h2::after { content: " −"; }
+.translation-rows { list-style: none; padding: 0; margin: 8px 0 0; }
+.translation-rows li { padding: 8px 0; border-bottom: 1px solid var(--glass-border); }
+.translation-rows li:last-child { border-bottom: 0; }
+.translation-rows .translation-text { font-size: 15px; margin: 0; }
+.row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 6px; font-size: 13px; }
+.row-actions button { min-height: 26px; font-size: 12px; }
+.other-languages li { display: grid; grid-template-columns: minmax(110px, 0.35fr) minmax(0, 1fr); gap: 4px 16px; font-size: 13px; }
+.comment-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.translation-rows time { font-size: 12px; }
+.comment-form label { display: block; margin: 12px 0 6px; font-size: 13px; font-weight: 600; }
+.comment-form textarea { display: block; width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg2); color: var(--fg); font: inherit; resize: vertical; }
+.comment-form .translation-actions { margin: 10px 0 0; }
+.translation-shots { display: flex; flex-wrap: wrap; gap: 10px; }
+.translation-shots img { display: block; max-width: min(100%, 280px); max-height: 180px; border-radius: var(--radius); border: 1px solid var(--glass-border); }
+@media (max-width: 620px) { .strings a { grid-template-columns: minmax(0, 1fr); gap: 4px; } .string-state { justify-content: flex-start; } .other-languages li { grid-template-columns: minmax(0, 1fr); gap: 0; } .translation-tabs { overflow-x: auto; } }
 @media (max-width: 620px) { .languages a { grid-template-columns: minmax(0, 1fr); gap: 6px; } .translation-shortcut { display: none; } }
 `;
 
@@ -71,6 +127,40 @@ export const TRANSLATE_JS = `
     }
   });
   form.addEventListener('submit', () => { dirty = false; });
+  const areas = [...form.querySelectorAll('textarea')];
+  let last = areas[0];
+  areas.forEach(a => a.addEventListener('focus', () => { last = a; }));
+  const put = (area, text) => {
+    if (!area || area.disabled) return;
+    const start = area.selectionStart ?? area.value.length, end = area.selectionEnd ?? start;
+    area.setRangeText(text, start, end, 'end'); area.focus(); area.dispatchEvent(new Event('input', {bubbles: true}));
+  };
+  // Placeholders in the English text insert themselves; copy and suggestions fill every form.
+  document.addEventListener('click', event => {
+    const ph = event.target.closest && event.target.closest('[data-insert]');
+    if (ph) { event.preventDefault(); put(last, ph.dataset.insert); return; }
+    const fill = event.target.closest && event.target.closest('[data-copy-source], [data-fill]');
+    if (!fill) return;
+    const values = JSON.parse(fill.dataset.copySource || fill.dataset.fill);
+    areas.forEach((a, i) => { if (!a.disabled) a.value = values[Math.min(i, values.length - 1)] ?? ''; });
+    if (areas[0]) { areas[0].focus(); areas[0].dispatchEvent(new Event('input', {bubbles: true})); }
+  });
+  if (areas.every(a => a.disabled)) document.querySelectorAll('.ph').forEach(b => { b.disabled = true; });
+  // Say which placeholders a translation leaves out, as you type.
+  const wanted = JSON.parse(form.dataset.placeholders || '[]'), warning = document.getElementById('placeholder-warning');
+  const check = () => {
+    if (!warning || !wanted.length) return;
+    const missing = wanted.filter(p => areas.some(a => a.value.trim() && !a.value.includes(p)));
+    warning.hidden = !missing.length;
+    warning.textContent = missing.length ? (warning.dataset.label || 'Missing from your translation:') + ' ' + missing.join('  ') : '';
+  };
+  form.addEventListener('input', check); check();
+  form.addEventListener('keydown', event => {
+    if (event.altKey && !event.ctrlKey && !event.metaKey && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
+      const link = document.querySelector(event.key === 'ArrowRight' ? 'a[rel=next]' : 'a[rel=prev]');
+      if (link) { event.preventDefault(); location.href = link.href; }
+    }
+  });
   if (/Mac|iPhone|iPad/.test(navigator.platform)) form.querySelectorAll('.translation-shortcut kbd:first-child').forEach(k => { k.textContent = '⌘'; });
 })();
 `;

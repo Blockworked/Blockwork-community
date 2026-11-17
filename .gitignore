@@ -3,3 +3,4 @@ node_modules/
 .dev.vars
 
 __pycache__/
+src/locales.generated.ts

@@ -18,7 +18,7 @@ test('email verification, passwords, browser passkeys, backup codes and reset in
   let providerChallenge = '';
   let origin = '';
   const options = {
-    rootPath: build, modulesRoot: build, modules: [{type: 'ESModule', path: join(build, 'index.js')}], compatibilityDate: '2026-10-01',
+    rootPath: build, modulesRoot: build, modules: [{type: 'ESModule', path: join(build, 'index.js')}], compatibilityDate: '2026-10-01', compatibilityFlags: ['nodejs_als'],
     d1Databases: ['DB'], r2Buckets: ['PACKS'],
     bindings: {SITE_URL: 'http://localhost', ADMINS: '', LIBRARY_NAME: 'Test community', LOCAL_AUTH_ENABLED: 'true', AUTH_TOTP_KEY: 'A'.repeat(43), SMTP2GO_API_KEY: 'test', GITHUB_CLIENT_ID: 'test-client', GITHUB_CLIENT_SECRET: 'test-secret'},
     outboundService: async (req: Request) => {

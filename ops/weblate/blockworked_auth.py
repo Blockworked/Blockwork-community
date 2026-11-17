@@ -1,9 +1,10 @@
 """Narrow signed authentication for the Blockworked contributor UI.
 
 Install alongside Weblate, add SignedBlockworkedAuthentication BEFORE existing
-REST_FRAMEWORK authentication classes. See docs/translations.md. No browser
-session, token issuing, admin, source edit, or suggestion acceptance endpoints
-can be reached using this authenticator.
+REST_FRAMEWORK authentication classes. See docs/translations.md. Only a
+translation edit, a new suggestion or vote, and a comment can be signed: no
+browser session, token issuing, admin, source edit, approval or suggestion
+acceptance endpoint can be reached using this authenticator.
 """
 import base64
 import hashlib
@@ -19,6 +20,38 @@ from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 
 
+# The only writes the contributor UI makes: a translation edit, a suggestion
+# (posting an existing one again is Weblate's vote) and a comment.
+ENDPOINTS = (
+    ('PATCH', re.compile(r'/api/units/([1-9][0-9]*)/')),
+    ('POST', re.compile(r'/api/units/([1-9][0-9]*)/suggestions/')),
+    ('POST', re.compile(r'/api/units/([1-9][0-9]*)/comments/')),
+)
+
+
+def allowed_endpoint(method, path):
+    """The unit id for an allowed method and exact path, else None."""
+    for allowed, pattern in ENDPOINTS:
+        match = pattern.fullmatch(path)
+        if method == allowed and match:
+            return int(match.group(1))
+    return None
+
+
+def valid_payload(path, data):
+    """Accept only the fields each endpoint needs; never approval or other serializer fields."""
+    if not isinstance(data, dict):
+        return False
+    target_ok = isinstance(data.get('target'), list) and bool(data['target']) and all(isinstance(v, str) for v in data['target'])
+    if path.endswith('/suggestions/'):
+        return set(data) == {'target'} and target_ok
+    if path.endswith('/comments/'):
+        return (set(data) == {'scope', 'comment'} and data['scope'] in ('translation', 'global', 'report')
+                and isinstance(data['comment'], str) and 1 <= len(data['comment']) <= 1000)
+    # Translated (20) or needs editing (10).
+    return set(data) == {'target', 'state'} and data['state'] in (10, 20) and target_ok
+
+
 def verify(headers, method, path, body, secret, now=None):
     """Validate the exact wire representation before parsing identity data."""
     timestamp = headers.get('X-Blockworked-Time', '')
@@ -31,7 +64,7 @@ def verify(headers, method, path, body, secret, now=None):
             or not re.fullmatch(r'[a-f0-9-]{36}', nonce)
             or not re.fullmatch(r'[A-Za-z0-9_-]{1,2048}', identity)
             or not re.fullmatch(r'[a-f0-9]{64}', signature)
-            or method != 'PATCH' or not re.fullmatch(r'/api/units/[1-9][0-9]*/', path)
+            or not allowed_endpoint(method, path)
             or len(body) > 100000):
         raise AuthenticationFailed('Invalid Blockworked request')
     canonical = '\n'.join([timestamp, nonce, identity, method, path, hashlib.sha256(body).hexdigest()])
@@ -64,7 +97,7 @@ class SignedBlockworkedAuthentication(BaseAuthentication):
                                  request.body, getattr(settings, 'BLOCKWORKED_SHARED_SECRET', ''))
         if not cache.add('blockworked-request:' + nonce, True, timeout=125):
             raise AuthenticationFailed('Blockworked request already used')
-        unit_id = int(request.path.rstrip('/').split('/')[-1])
+        unit_id = allowed_endpoint(request.method, request.path)
         allowed = getattr(settings, 'BLOCKWORKED_COMPONENTS', [])
         unit = Unit.objects.select_related('translation__component__project').filter(pk=unit_id).first()
         if unit is None:
@@ -72,11 +105,7 @@ class SignedBlockworkedAuthentication(BaseAuthentication):
         component = unit.translation.component
         if f'{component.project.slug}/{component.slug}' not in allowed:
             raise AuthenticationFailed('Translation not available')
-        # Accept only translation edits; never approval or arbitrary serializer fields.
-        data = request.data
-        if (not isinstance(data, dict) or set(data) != {'target', 'state'} or data['state'] != 20
-                or not isinstance(data['target'], list)
-                or not all(isinstance(value, str) for value in data['target'])):
+        if not valid_payload(request.path, request.data):
             raise AuthenticationFailed('Invalid translation edit')
         group = Group.objects.filter(pk=getattr(settings, 'BLOCKWORKED_TRANSLATOR_GROUP_ID', None)).first()
         if group is None:
