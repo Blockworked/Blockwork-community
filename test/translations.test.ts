@@ -155,6 +155,9 @@ test('dedicated translation host serves its root, keeps links there, and uses co
     assert.match(html,/href="https:\/\/translate\.blockworked\.com\/blockwork\/ui"/);
     assert.match(html,/href="https:\/\/community.example.com\/login\?next=/);
     assert.doesNotMatch(html,/translate\.blockworked\.com\/\/blockwork/);
+    // Translation calls belong in code, never as text inside the page's CSS or markup.
+    assert.match(html,/font-family: "Atkinson Hyperlegible Next"/);
+    assert.doesNotMatch(html,/(?<![\w.$])(t|tp|tt|tn)\(["'`]/);
     const alias=await worker.fetch(new Request(f.env.SITE_URL+'/translate/blockwork/ui/ar?view=all'),f.env,{} as ExecutionContext);
     assert.equal(alias.status,308); assert.equal(alias.headers.get('Location'),'https://translate.blockworked.com/blockwork/ui/ar?view=all');
     const script=await worker.fetch(new Request('https://translate.blockworked.com/translate.js'),f.env,{} as ExecutionContext);

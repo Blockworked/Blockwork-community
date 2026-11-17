@@ -1211,22 +1211,6 @@ msgstr ""
 msgid "The pack's blocks are broken."
 msgstr ""
 
-#: src/pages.ts
-msgid "Atkinson Hyperlegible Next"
-msgstr ""
-
-#: src/pages.ts
-msgid "Segoe UI"
-msgstr ""
-
-#: src/pages.ts
-msgid "Cascadia Code"
-msgstr ""
-
-#: src/pages.ts
-msgid "JetBrains Mono"
-msgstr ""
-
 #: src/pages.ts src/site-nav.ts
 msgid "Translate"
 msgstr ""
