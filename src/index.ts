@@ -102,7 +102,7 @@ export default {
   },
 
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    setMainSite(env.MAIN_SITE_URL, supportUrl(env));
+    setMainSite(env.MAIN_SITE_URL, supportUrl(env), translationSite(env).href);
     let res: Response;
     try {
       res = await route(req, env, ctx);

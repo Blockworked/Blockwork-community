@@ -9,12 +9,15 @@ import { esc } from "./pages.ts";
 
 let mainUrl = "https://blockworked.com";
 let supportUrl = "https://support.blockworked.com";
+let translateUrl = "https://translate.blockworked.com";
 
 /** Points the shared links at a different main site, like a local
- *  `pnpm dev` (MAIN_SITE_URL in wrangler.toml), and at the helpdesk. */
-export function setMainSite(url: string | undefined, support?: string): void {
+ *  `pnpm dev` (MAIN_SITE_URL in wrangler.toml), the helpdesk and the
+ *  translation site. */
+export function setMainSite(url: string | undefined, support?: string, translate?: string): void {
   if (url) mainUrl = url.replace(/\/$/, "");
   if (support) supportUrl = support.replace(/\/$/, "");
+  if (translate) translateUrl = translate.replace(/\/$/, "");
 }
 
 /** Where the community library's links point from the page being drawn:
@@ -35,6 +38,8 @@ function navLinks(place: NavPlace): { href: string; label: string; current?: boo
     { href: `${mainUrl}/download`, label: "Download" },
     { href: `${mainUrl}/changelog`, label: "Changelog" },
     { href: place.community, label: "Community", current: place.section === "community" },
+    { href: `${supportUrl}/`, label: "Support", current: place.section === "support" },
+    { href: `${translateUrl}/`, label: "Translate", current: place.section === "translations" },
   ];
 }
 
@@ -99,7 +104,7 @@ export const SITE_NAV_CSS = `
 .theme-toggle .icon-moon { display: none; }
 :root[data-theme="light"] .theme-toggle .icon-sun { display: none; }
 :root[data-theme="light"] .theme-toggle .icon-moon { display: block; }
-@media (max-width: 720px) { .site-nav { display: none; } }
+@media (max-width: 920px) { .site-nav { display: none; } }
 @media (max-width: 400px) { .header-cta { display: none; } }
 
 .site-footer { border-top: 1px solid var(--glass-border); background: var(--glass); padding: 28px 0; font-size: 13px; }
