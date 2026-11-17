@@ -1,4 +1,5 @@
 // Provider identities are independent from account IDs. Email is never a linking signal.
+import { t, tn, tp, raw } from './i18n.ts';
 import { createRemoteJWKSet, jwtVerify, customFetch } from 'jose';
 import type { Env } from './index.ts';
 import { cookie, currentUser, isAdmin, isReservedName, randomToken, safeNext, PROVIDERS, type Provider, type User } from './auth.ts';
@@ -16,8 +17,8 @@ function stateCookie(token: string): string {
   return `${STATE_COOKIE}=${token}; Path=/; Max-Age=${token ? 600 : 0}; HttpOnly; Secure; SameSite=Lax`;
 }
 const callbackUri = (env: Env, provider: Provider) => `${new URL(env.SITE_URL).origin}/auth/${provider}/callback`;
-function failure(env: Env, text = 'This connection expired or could not be verified. Try again from Account security.', status = 400): Response {
-  const response = accountPage(null, env, 'Account connection', `<p role="alert">${esc(text)}</p><p><a href="/account/security">Account security</a></p>`, status);
+function failure(env: Env, text = tp('This connection expired or could not be verified. Try again from Account security.'), status = 400): Response {
+  const response = accountPage(null, env, tp('Account connection'), `<p role="alert">${esc(text)}</p><p><a href="/account/security">${t('Account security')}</a></p>`, status);
   response.headers.append('Set-Cookie', stateCookie(''));
   return response;
 }
@@ -81,7 +82,7 @@ async function fetchProfile(env: Env, provider: Provider, code: string, data: {v
     headers: {Authorization: `Bearer ${token.access_token}`},
   });
   if (me.sub !== payload.sub) throw new Error('Provider verification failed');
-  return {id: `google:${payload.sub}`, subject: payload.sub, name: (me.name || 'Google user').slice(0, 80), avatar: me.picture ?? ''};
+  return {id: `google:${payload.sub}`, subject: payload.sub, name: (me.name || tp('Google user')).slice(0, 80), avatar: me.picture ?? ''};
 }
 export async function callback(req: Request, env: Env, provider: Provider): Promise<Response> {
   const url = new URL(req.url);
@@ -99,12 +100,12 @@ export async function callback(req: Request, env: Env, provider: Provider): Prom
   if (!flow) return failure(env);
   const data = JSON.parse(flow.data);
   let profile: Awaited<ReturnType<typeof fetchProfile>>;
-  try { profile = await fetchProfile(env, provider, code, data); } catch { return failure(env, 'The provider could not verify this sign-in. Try again.', 401); }
+  try { profile = await fetchProfile(env, provider, code, data); } catch { return failure(env, tp('The provider could not verify this sign-in. Try again.'), 401); }
   if (linking) {
     const token = await makeFlow(env, 'oauth-confirm', user!.id, {provider, subject: profile.subject, label: profile.name, session_hash: proof!.token_hash}, 600, flow.auth_version);
-    const response = accountPage(user, env, 'Confirm account connection', `<p>Connect ${esc(PROVIDERS[provider])} account <strong>${esc(profile.name)}</strong> to <strong>${esc(user!.name)}</strong>?</p>
-      <p>This lets you sign into this same Blockworked account with ${esc(PROVIDERS[provider])}. Your existing MFA remains required.</p>
-      <form method="post" action="/account/oauth/confirm"><input type="hidden" name="token" value="${esc(token)}"><button>Connect ${esc(PROVIDERS[provider])}</button></form><p><a href="/account/security">Cancel</a></p>`);
+    const response = accountPage(user, env, tp('Confirm account connection'), `<p>${t('Connect {provider} account {account} to {user}?', { provider: PROVIDERS[provider], account: raw(`<strong>${esc(profile.name)}</strong>`), user: raw(`<strong>${esc(user!.name)}</strong>`) })}</p>
+      <p>${t('This lets you sign into this same Blockworked account with {provider}. Your existing MFA remains required.', { provider: PROVIDERS[provider] })}</p>
+      <form method="post" action="/account/oauth/confirm"><input type="hidden" name="token" value="${esc(token)}"><button>Connect ${esc(PROVIDERS[provider])}</button></form><p><a href="/account/security">${t('Cancel')}</a></p>`);
     response.headers.append('Set-Cookie', stateCookie(''));
     return response;
   }
@@ -115,8 +116,8 @@ export async function callback(req: Request, env: Env, provider: Provider): Prom
   const next = safeNext(data.next, env);
   if (!identity) {
     // A security-settings re-auth must use an identity already belonging to this account.
-    if (new URL(next, env.SITE_URL).pathname === '/account/unlock/complete') return failure(env, 'Use a sign-in method already connected to your account.', 403);
-    if (isReservedName(profile.name) && !isAdmin(env, {id: profile.id, name: profile.name, avatar: '', banned: 0})) return failure(env, 'This display name is reserved for the Blockworked team.', 403);
+    if (new URL(next, env.SITE_URL).pathname === '/account/unlock/complete') return failure(env, tp('Use a sign-in method already connected to your account.'), 403);
+    if (isReservedName(profile.name) && !isAdmin(env, {id: profile.id, name: profile.name, avatar: '', banned: 0})) return failure(env, tp('This display name is reserved for the Blockworked team.'), 403);
     const used = await env.DB.prepare('SELECT 1 FROM users WHERE id = ?').bind(profile.id).first();
     const id = used ? `account:${crypto.randomUUID()}` : profile.id;
     const now = Date.now();
@@ -128,7 +129,7 @@ export async function callback(req: Request, env: Env, provider: Provider): Prom
     } catch { /* A concurrent first sign-in may already have created this identity. */ }
     identity = await find();
   }
-  if (!identity || identity.banned) return failure(env, 'This account cannot sign in.', 403);
+  if (!identity || identity.banned) return failure(env, tp('This account cannot sign in.'), 403);
   const response = await finishPrimary(env, identity.user_id, identity.auth_version, next);
   response.headers.append('Set-Cookie', stateCookie(''));
   return response;
@@ -136,8 +137,8 @@ export async function callback(req: Request, env: Env, provider: Provider): Prom
 
 export async function oauthSettings(req: Request, env: Env, user: User | null, path: string, body: Record<string, unknown>): Promise<Response> {
   const proof = user ? await securitySession(req, env, user) : null;
-  if (!user || !proof) return failure(env, 'Unlock Account security before changing connections.', 401);
-  if (!await limit(env, 'oauth-settings', user.id, 15, 3600)) return failure(env, 'Too many connection changes. Try again in an hour.', 429);
+  if (!user || !proof) return failure(env, tp('Unlock Account security before changing connections.'), 401);
+  if (!await limit(env, 'oauth-settings', user.id, 15, 3600)) return failure(env, tp('Too many connection changes. Try again in an hour.'), 429);
   const match = /^\/account\/oauth\/(github|google)\/(connect|disconnect)$/.exec(path);
   if (match?.[2] === 'connect') {
     const started = await authorize(env, match[1] as Provider, '/account/security', user, proof);
@@ -147,7 +148,7 @@ export async function oauthSettings(req: Request, env: Env, user: User | null, p
     // provider is deliberately blocked by our form-action 'self' CSP.
     const response = req.headers.get('Content-Type')?.startsWith('application/json')
       ? new Response(JSON.stringify({authorization}), {headers: {'Content-Type': 'application/json', 'Cache-Control': 'no-store'}})
-      : accountPage(user, env, 'Connect sign-in account', `<p><a class="button" href="${esc(authorization)}">Continue to ${esc(PROVIDERS[match[1] as Provider])}</a></p>`);
+      : accountPage(user, env, tp('Connect sign-in account'), `<p><a class="button" href="${esc(authorization)}">${t('Continue to {provider}', { provider: PROVIDERS[match[1] as Provider] })}</a></p>`);
     for (const value of started.headers.getSetCookie()) response.headers.append('Set-Cookie', value);
     return response;
   }
@@ -162,8 +163,8 @@ export async function oauthSettings(req: Request, env: Env, user: User | null, p
         params: [data.provider, data.subject, user.id, data.provider],
       }, [{sql: `INSERT INTO oauth_identities (provider, subject, user_id, label, created_at) SELECT ?, ?, ?, ?, ? WHERE ${CHANGE_GATE}`,
         params: [data.provider, data.subject, user.id, data.label, Date.now()]}], 'oauth_connected', data.provider);
-      if (!done) return failure(env, 'That provider account is already connected, or the request expired.', 409);
-    } catch { return failure(env, 'That provider account could not be connected. Accounts are never merged automatically.', 409); }
+      if (!done) return failure(env, tp('That provider account is already connected, or the request expired.'), 409);
+    } catch { return failure(env, tp('That provider account could not be connected. Accounts are never merged automatically.'), 409); }
     await notify(env, user.id, `${PROVIDERS[data.provider as Provider]} sign-in was connected to your account. Other browsers and apps were signed out.`);
     return issueSession(env, user.id, proof.auth_version + 1, proof.auth_strength, '/account/security', proof.security_unlocked_at);
   }
@@ -178,9 +179,9 @@ export async function oauthSettings(req: Request, env: Env, user: User | null, p
         OR EXISTS (SELECT 1 FROM oauth_identities WHERE user_id = ? AND provider != ?))`,
       params: [user.id, provider, user.id, user.id, user.id, provider],
     }, [{sql: `DELETE FROM oauth_identities WHERE user_id = ? AND provider = ? AND ${CHANGE_GATE}`, params: [user.id, provider]}], 'oauth_disconnected', provider);
-    if (!done) return failure(env, 'Connect another sign-in method before disconnecting this provider. Authenticator codes alone cannot sign you in.', 400);
+    if (!done) return failure(env, tp('Connect another sign-in method before disconnecting this provider. Authenticator codes alone cannot sign you in.'), 400);
     await notify(env, user.id, `${PROVIDERS[provider]} sign-in was disconnected. Other browsers and apps were signed out. You can also revoke Blockworked access in your provider account settings.`);
     return issueSession(env, user.id, proof.auth_version + 1, proof.auth_strength, '/account/security', proof.security_unlocked_at);
   }
-  return failure(env, 'Not found', 404);
+  return failure(env, tp('Not found'), 404);
 }

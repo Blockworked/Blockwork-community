@@ -5,6 +5,546 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+#: src/account-lifecycle.ts
+msgid "Reactivate account"
+msgstr ""
+
+#: src/account-lifecycle.ts
+msgid "Sign in again to confirm reactivation."
+msgstr ""
+
+#: src/account-lifecycle.ts src/comments.ts src/local-auth.ts src/pages.ts src/support.ts
+msgid "Sign in"
+msgstr ""
+
+#: src/account-lifecycle.ts
+msgid "Your account is deactivated. Reactivating restores your profile and sign-in access."
+msgstr ""
+
+#: src/account-lifecycle.ts
+msgid "Reactivate my account"
+msgstr ""
+
+#: src/account-lifecycle.ts
+msgid "Deactivate account"
+msgstr ""
+
+#: src/account-lifecycle.ts
+msgid "Hide your profile, packs and comments and sign out every browser and app. Your username and credentials stay reserved. Sign in with your usual credentials and MFA to reactivate."
+msgstr ""
+
+#: src/account-lifecycle.ts
+msgid "Deactivate my account"
+msgstr ""
+
+#: src/account-lifecycle.ts
+msgid "Confirm deactivation"
+msgstr ""
+
+#: src/account-lifecycle.ts
+msgid "Delete account permanently"
+msgstr ""
+
+#: src/account-lifecycle.ts
+msgid "Type DELETE to confirm"
+msgstr ""
+
+#: src/account-lifecycle.ts
+msgid "Delete my account permanently"
+msgstr ""
+
+#: src/account-lifecycle.ts
+msgid "Confirm the account action first."
+msgstr ""
+
+#: src/account-lifecycle.ts
+msgid "Confirmation expired."
+msgstr ""
+
+#: src/account-lifecycle.ts
+msgid "The account changed. Sign in and try again."
+msgstr ""
+
+#: src/account-lifecycle.ts
+msgid "Your Blockworked account was deleted. If you did not request this, contact support."
+msgstr ""
+
+#: src/account-lifecycle.ts
+msgid "Your Blockworked account was deactivated. Sign in with your normal credentials and MFA to reactivate. If you did not request this, contact support."
+msgstr ""
+
+#: src/account-security.ts
+msgid "Use a password between 15 and 128 characters."
+msgstr ""
+
+#: src/account-security.ts
+msgid "Use a sign-in method belonging to this account."
+msgstr ""
+
+#: src/account-security.ts
+msgid "Sign-in expired. Try again."
+msgstr ""
+
+#: src/account-security.ts
+msgid "This password appears in known breaches. Choose a different password."
+msgstr ""
+
+#: src/account-security.ts
+msgid "Password safety checks are temporarily unavailable. Try again later."
+msgstr ""
+
+#: src/account-views.ts src/pages.ts src/support.ts src/translate.ts
+msgid "Account settings"
+msgstr ""
+
+#: src/account-views.ts
+msgid "Profile"
+msgstr ""
+
+#: src/account-views.ts
+msgid "Security"
+msgstr ""
+
+#: src/api.ts
+msgid "Sign in to Blockwork"
+msgstr ""
+
+#: src/browse.ts
+msgid "Best match"
+msgstr ""
+
+#: src/browse.ts
+msgid "Name"
+msgstr ""
+
+#: src/browse.ts
+msgid "Recently updated"
+msgstr ""
+
+#: src/browse.ts
+msgid "Newest"
+msgstr ""
+
+#: src/browse.ts
+msgid "Most discussed"
+msgstr ""
+
+#: src/browse.ts
+#, python-brace-format
+msgid "{n} comment"
+msgid_plural "{n} comments"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/browse.ts
+#, python-brace-format
+msgid "by {author}"
+msgstr ""
+
+#: src/browse.ts
+#, python-brace-format
+msgid "{n} block"
+msgid_plural "{n} blocks"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/browse.ts
+#, python-brace-format
+msgid "updated {date}"
+msgstr ""
+
+#: src/browse.ts
+msgid "Any permissions"
+msgstr ""
+
+#: src/browse.ts
+msgid "Needs no permissions"
+msgstr ""
+
+#: src/browse.ts
+msgid "Nothing risky"
+msgstr ""
+
+#: src/browse.ts
+msgid "Search packs, blocks and authors"
+msgstr ""
+
+#: src/browse.ts
+msgid "Search packs"
+msgstr ""
+
+#: src/browse.ts
+msgid "Permissions"
+msgstr ""
+
+#: src/browse.ts
+msgid "Sort by"
+msgstr ""
+
+#: src/browse.ts
+msgid "Official only"
+msgstr ""
+
+#: src/browse.ts src/translate.ts
+msgid "Search"
+msgstr ""
+
+#: src/browse.ts
+#, python-brace-format
+msgid "{n} pack of {total}"
+msgid_plural "{n} packs of {total}"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/browse.ts
+msgid "Clear filters"
+msgstr ""
+
+#: src/browse.ts
+#, python-brace-format
+msgid "{n} pack"
+msgid_plural "{n} packs"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/browse.ts
+msgid "No packs match that."
+msgstr ""
+
+#: src/browse.ts
+msgid "No packs yet."
+msgstr ""
+
+#: src/browse.ts
+msgid "See every pack"
+msgstr ""
+
+#: src/browse.ts src/pages.ts src/site-nav.ts
+msgid "Community blocks"
+msgstr ""
+
+#: src/browse.ts
+msgid "Packs of blocks people made for Blockwork."
+msgstr ""
+
+#: src/browse.ts src/index.ts src/pages.ts
+msgid "Submit a pack"
+msgstr ""
+
+#: src/browse.ts
+#, python-brace-format
+msgid "Install packs in Blockwork from {place}"
+msgstr ""
+
+#: src/browse.ts
+msgid "My Blocks"
+msgstr ""
+
+#: src/browse.ts
+msgid "Browse"
+msgstr ""
+
+#: src/browse.ts src/site-nav.ts
+msgid "Download"
+msgstr ""
+
+#: src/browse.ts
+#, python-brace-format
+msgid "first shared {date}"
+msgstr ""
+
+#: src/browse.ts
+msgid "Pack"
+msgstr ""
+
+#: src/browse.ts src/comments.ts src/email-change.ts src/index.ts src/language-proposals.ts src/local-auth.ts src/oauth.ts src/passkeys.ts src/profile.ts src/support.ts src/totp.ts src/translate.ts
+msgid "Not found"
+msgstr ""
+
+#: src/browse.ts src/comments.ts
+msgid "That pack isn't in the library."
+msgstr ""
+
+#: src/browse.ts
+msgid "source"
+msgstr ""
+
+#: src/browse.ts
+msgid "file"
+msgstr ""
+
+#: src/browse.ts
+msgid "What it can do"
+msgstr ""
+
+#: src/browse.ts
+msgid "See how they work"
+msgstr ""
+
+#: src/browse.ts
+msgid "Versions"
+msgstr ""
+
+#: src/browse.ts
+msgid "Source view"
+msgstr ""
+
+#: src/browse.ts
+msgid "Blocks"
+msgstr ""
+
+#: src/browse.ts
+msgid "Pack file"
+msgstr ""
+
+#: src/browse.ts
+msgid "Raw"
+msgstr ""
+
+#: src/browse.ts
+msgid "The pack file is missing."
+msgstr ""
+
+#: src/browse.ts
+msgid "That version isn't in the library."
+msgstr ""
+
+#: src/browse.ts
+#, python-brace-format
+msgid "showing version {version} ({link})"
+msgstr ""
+
+#: src/browse.ts
+msgid "see current"
+msgstr ""
+
+#: src/browse.ts
+msgid "There's no one here by that name."
+msgstr ""
+
+#: src/browse.ts
+msgid "The Blockworked team’s official packs."
+msgstr ""
+
+#: src/browse.ts
+#, python-brace-format
+msgid "Sharing blocks since {date}."
+msgstr ""
+
+#: src/browse.ts
+#, python-brace-format
+msgid "{n} pack."
+msgid_plural "{n} packs."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/browse.ts
+msgid "No packs listed yet."
+msgstr ""
+
+#: src/comments.ts src/support.ts
+msgid "Write something first."
+msgstr ""
+
+#: src/comments.ts
+msgid "Delete this comment"
+msgstr ""
+
+#: src/comments.ts
+msgid "Delete"
+msgstr ""
+
+#: src/comments.ts
+#, python-brace-format
+msgid "{link} to comment."
+msgstr ""
+
+#: src/comments.ts
+msgid "This account can't comment."
+msgstr ""
+
+#: src/comments.ts src/translate.ts
+msgid "Comment"
+msgstr ""
+
+#: src/comments.ts
+msgid "Ask a question, share how you use it, or report a problem"
+msgstr ""
+
+#: src/comments.ts
+msgid "Plain text. Links work. Be kind."
+msgstr ""
+
+#: src/comments.ts src/translate.ts
+msgid "Post comment"
+msgstr ""
+
+#: src/comments.ts
+msgid "No comments yet."
+msgstr ""
+
+#: src/comments.ts
+msgid "That's a lot of comments in a few minutes. Try again shortly."
+msgstr ""
+
+#: src/comments.ts src/index.ts
+msgid "That comment doesn't exist."
+msgstr ""
+
+#: src/email-change.ts src/local-auth.ts src/oauth.ts
+msgid "Account security"
+msgstr ""
+
+#: src/email-change.ts
+msgid "Email change expired"
+msgstr ""
+
+#: src/email-change.ts
+msgid "This confirmation link is no longer valid."
+msgstr ""
+
+#: src/email-change.ts
+msgid "Cancel email change"
+msgstr ""
+
+#: src/email-change.ts
+msgid "Confirm email change"
+msgstr ""
+
+#: src/email-change.ts
+#, python-brace-format
+msgid "Cancel the request to change the account email from {old} to {new}?"
+msgstr ""
+
+#: src/email-change.ts
+#, python-brace-format
+msgid "Approve the request to change the account email from {old} to {new}?"
+msgstr ""
+
+#: src/email-change.ts
+msgid "Confirm this email address"
+msgstr ""
+
+#: src/email-change.ts
+msgid "Both addresses must be confirmed. The account owner then finishes the change in unlocked Account security."
+msgstr ""
+
+#: src/email-change.ts
+msgid "Email change cancelled"
+msgstr ""
+
+#: src/email-change.ts
+msgid "The pending change was cancelled. Your current email still works."
+msgstr ""
+
+#: src/email-change.ts
+msgid "This request was already handled."
+msgstr ""
+
+#: src/email-change.ts
+msgid "Email address confirmed"
+msgstr ""
+
+#: src/email-change.ts
+msgid "Return to Account security after confirming both addresses, then finish the email change. You may need to unlock settings again."
+msgstr ""
+
+#: src/email-change.ts
+msgid "This confirmation expired."
+msgstr ""
+
+#: src/email-change.ts src/local-auth.ts src/security-unlock.ts
+msgid "Unlock security settings"
+msgstr ""
+
+#: src/email-change.ts
+msgid "Unlock Account security before changing your email."
+msgstr ""
+
+#: src/email-change.ts
+msgid "Email unavailable"
+msgstr ""
+
+#: src/email-change.ts src/local-auth.ts
+msgid "Account email is temporarily unavailable."
+msgstr ""
+
+#: src/email-change.ts
+msgid "Email change"
+msgstr ""
+
+#: src/email-change.ts src/local-auth.ts
+msgid "Enter a valid email address."
+msgstr ""
+
+#: src/email-change.ts
+msgid "Add verified email credentials before changing the email."
+msgstr ""
+
+#: src/email-change.ts
+msgid "Enter a different email address."
+msgstr ""
+
+#: src/email-change.ts
+msgid "Too many requests. Try again in an hour."
+msgstr ""
+
+#: src/email-change.ts
+msgid "That address cannot be used for this change."
+msgstr ""
+
+#: src/email-change.ts
+msgid "Your account changed. Unlock settings and try again."
+msgstr ""
+
+#: src/email-change.ts
+msgid "Approve your Blockworked email change"
+msgstr ""
+
+#: src/email-change.ts
+msgid "Verify your new Blockworked email"
+msgstr ""
+
+#: src/email-change.ts
+msgid "Both confirmation emails could not be sent. Your email has not changed. Try again later."
+msgstr ""
+
+#: src/email-change.ts
+msgid "Confirm both email addresses"
+msgstr ""
+
+#: src/email-change.ts
+msgid "Confirmation emails were sent to your current and new addresses. Confirm both within one hour, then finish the change in Account security."
+msgstr ""
+
+#: src/email-change.ts
+msgid "Confirm both addresses before finishing the change."
+msgstr ""
+
+#: src/email-change.ts
+msgid "This request expired."
+msgstr ""
+
+#: src/email-change.ts
+msgid "This request expired or the address is unavailable. Your email was not changed."
+msgstr ""
+
+#: src/email-change.ts
+msgid "The change could not be completed. Your current address still works."
+msgstr ""
+
+#: src/email-change.ts
+msgid "Your Blockworked account email was changed. Other browsers, apps and pending recovery links were signed out or invalidated. Your password, passkeys, authenticator app and backup codes are unchanged. If this was not you, contact support immediately."
+msgstr ""
+
+#: src/email-change.ts
+msgid "Blockworked email changed"
+msgstr ""
+
+#: src/email-change.ts
+msgid "There is nothing here."
+msgstr ""
+
 #: src/index.ts
 msgid "Sign-in is busy"
 msgstr ""
@@ -21,6 +561,14 @@ msgstr ""
 msgid "Try again in a moment."
 msgstr ""
 
+#: src/index.ts src/support.ts
+msgid "There's nothing here."
+msgstr ""
+
+#: src/index.ts src/pages.ts
+msgid "My packs"
+msgstr ""
+
 #: src/language-proposals.ts
 msgid "You’ll help"
 msgstr ""
@@ -29,7 +577,7 @@ msgstr ""
 msgid "I’ll help translate"
 msgstr ""
 
-#: src/language-proposals.ts
+#: src/language-proposals.ts src/pages.ts
 msgid "Review"
 msgstr ""
 
@@ -110,7 +658,7 @@ msgstr ""
 msgid "Ask for a language that isn’t open yet. It’s added once a few people say they’ll help translate it."
 msgstr ""
 
-#: src/language-proposals.ts
+#: src/language-proposals.ts src/site-nav.ts
 msgid "Language"
 msgstr ""
 
@@ -159,10 +707,6 @@ msgstr ""
 msgid "You’ve proposed the most languages allowed in a day. Try again tomorrow."
 msgstr ""
 
-#: src/language-proposals.ts src/translate.ts
-msgid "Not found"
-msgstr ""
-
 #: src/language-proposals.ts
 msgid "Language request not found"
 msgstr ""
@@ -187,16 +731,967 @@ msgstr ""
 msgid "Weblate didn’t add the language. Check WEBLATE_LANGUAGE_TOKEN, or add it in Weblate and try again."
 msgstr ""
 
+#: src/local-auth.ts src/passkeys.ts
+msgid "Verification expired or failed. Sign in and try again."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Check your email"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "If this address is eligible, an email with the next steps will arrive shortly."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Back to sign in"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Security settings are unlocked for this browser. Settings lock after 30 minutes of inactivity or one hour total."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Lock security settings"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Email and password"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "New password"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Change password"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Change linked email"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "New email address"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Request email change"
+msgstr ""
+
+#: src/local-auth.ts
+#, python-brace-format
+msgid "Pending: {email}"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Current address: confirmed"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Current address: waiting"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "New address: confirmed"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "New address: waiting"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Finish email change"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Add verified email credentials to this account. This preserves your packs and support tickets."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Verify email"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Use a unique password with at least 15 characters. Password managers and pasting are supported."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Connected sign-in accounts"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Not connected"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Passkeys"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Use a passkey to sign in directly, or as a second step after your password or Google/GitHub sign-in."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Remove"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "No passkeys yet."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Passkey name"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Add passkey"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Keep at least one passkey or authenticator app. Add a replacement before removing a lost device."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Authenticator app"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Enabled. Your app generates a new six-digit code every 30 seconds."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Use six-digit codes from an authenticator app as a second sign-in step."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Replace authenticator app"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Set up authenticator app"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Remove authenticator app"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Backup codes"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Generate new backup codes"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Generating codes invalidates all previous codes."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Signed-in sessions"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Sign out all browsers and apps"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Recent account changes"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Linked email changed"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Sign-in connected"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Sign-in disconnected"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "No recent changes."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Account status"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Deactivate or delete account"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Email accounts and passkeys are not enabled yet."
+msgstr ""
+
+#: src/local-auth.ts src/pages.ts
+msgid "Create an account"
+msgstr ""
+
+#: src/local-auth.ts src/profile.ts
+msgid "Display name"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "You will set a password after verifying your email."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Reset password"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Send reset link"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Resetting your password signs out all browsers and apps. Your passkeys, authenticator app and backup codes stay in place."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Set a new password"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Verify email and set password"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Save password"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Use a unique password with at least 15 characters."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Verify your sign-in"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Use a passkey"
+msgstr ""
+
+#: src/local-auth.ts src/totp.ts
+msgid "Six-digit code"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Verify authenticator code"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Lost access to your second factor?"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Backup code"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Use backup code"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "After signing in with a backup code, add a replacement passkey or authenticator app in Account security."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Too many attempts. Try again in 15 minutes."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Invalid or oversized request."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Email or password is incorrect."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Reset your Blockworked password"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Unlock Account security before adding email credentials."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Verify your Blockworked email"
+msgstr ""
+
+#: src/local-auth.ts src/profile.ts
+msgid "Choose a display name between 1 and 80 characters. Team names are reserved."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Unlock Account security before changing your password."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Sign in to the account that requested this email address, then reopen the link."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Your Blockworked password changed. All browsers and apps have been signed out. Your passkeys, authenticator app and backup codes remain active."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Password updated"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "All browsers and apps have been signed out. Sign in with your new password and, if enrolled, a passkey, authenticator-app code or backup code."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "This link can no longer be used. Try signing in or resetting your password."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Email verified"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Your email and password are ready. You can now sign in."
+msgstr ""
+
+#: src/local-auth.ts src/passkeys.ts
+msgid "Unlock Account security before changing security settings."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "New Blockworked backup codes were generated. All previous backup codes are invalid."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Save your backup codes"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "These codes are shown once. Save them in a secure place. Each works once with your password or Google/GitHub sign-in."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "I saved my codes"
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Add a password or provider sign-in before removing your last passkey."
+msgstr ""
+
+#: src/local-auth.ts
+msgid "Add a replacement passkey or authenticator app before removing the last one."
+msgstr ""
+
+#: src/oauth.ts
+msgid "This connection expired or could not be verified. Try again from Account security."
+msgstr ""
+
+#: src/oauth.ts
+msgid "Account connection"
+msgstr ""
+
+#: src/oauth.ts
+msgid "Google user"
+msgstr ""
+
+#: src/oauth.ts
+msgid "The provider could not verify this sign-in. Try again."
+msgstr ""
+
+#: src/oauth.ts
+msgid "Confirm account connection"
+msgstr ""
+
+#: src/oauth.ts
+#, python-brace-format
+msgid "Connect {provider} account {account} to {user}?"
+msgstr ""
+
+#: src/oauth.ts
+#, python-brace-format
+msgid "This lets you sign into this same Blockworked account with {provider}. Your existing MFA remains required."
+msgstr ""
+
+#: src/oauth.ts
+msgid "Cancel"
+msgstr ""
+
+#: src/oauth.ts
+msgid "Use a sign-in method already connected to your account."
+msgstr ""
+
+#: src/oauth.ts
+msgid "This display name is reserved for the Blockworked team."
+msgstr ""
+
+#: src/oauth.ts
+msgid "This account cannot sign in."
+msgstr ""
+
+#: src/oauth.ts
+msgid "Unlock Account security before changing connections."
+msgstr ""
+
+#: src/oauth.ts
+msgid "Too many connection changes. Try again in an hour."
+msgstr ""
+
+#: src/oauth.ts
+msgid "Connect sign-in account"
+msgstr ""
+
+#: src/oauth.ts
+#, python-brace-format
+msgid "Continue to {provider}"
+msgstr ""
+
+#: src/oauth.ts
+msgid "That provider account is already connected, or the request expired."
+msgstr ""
+
+#: src/oauth.ts
+msgid "That provider account could not be connected. Accounts are never merged automatically."
+msgstr ""
+
+#: src/oauth.ts
+msgid "Connect another sign-in method before disconnecting this provider. Authenticator codes alone cannot sign you in."
+msgstr ""
+
+#: src/packs.ts
+msgid "That file is over 2 MB."
+msgstr ""
+
+#: src/packs.ts
+msgid "That isn't a block pack. Make one in Blockwork with \"Share blocks as a pack...\"."
+msgstr ""
+
+#: src/packs.ts
+msgid "This pack was made by a newer version of Blockwork than the library supports."
+msgstr ""
+
+#: src/packs.ts
+msgid "The pack has no name."
+msgstr ""
+
+#: src/packs.ts
+msgid "The pack's name is over 80 characters."
+msgstr ""
+
+#: src/packs.ts
+msgid "The pack's id is empty."
+msgstr ""
+
+#: src/packs.ts
+msgid "The pack's id is over 64 characters."
+msgstr ""
+
+#: src/packs.ts
+msgid "The description is over 500 characters."
+msgstr ""
+
+#: src/packs.ts
+msgid "The version is over 32 characters."
+msgstr ""
+
+#: src/packs.ts
+msgid "The pack has no blocks."
+msgstr ""
+
+#: src/packs.ts
+msgid "The pack has over 200 blocks."
+msgstr ""
+
+#: src/packs.ts
+msgid "The pack's blocks are broken."
+msgstr ""
+
+#: src/pages.ts
+msgid "Atkinson Hyperlegible Next"
+msgstr ""
+
+#: src/pages.ts
+msgid "Segoe UI"
+msgstr ""
+
+#: src/pages.ts
+msgid "Cascadia Code"
+msgstr ""
+
+#: src/pages.ts
+msgid "JetBrains Mono"
+msgstr ""
+
+#: src/pages.ts src/site-nav.ts
+msgid "Translate"
+msgstr ""
+
+#: src/pages.ts src/support.ts
+msgid "Sign out"
+msgstr ""
+
+#: src/pages.ts
+msgid "Blockwork community blocks"
+msgstr ""
+
+#: src/pages.ts
+msgid "Doesn't use any blocks that need permission."
+msgstr ""
+
+#: src/pages.ts
+msgid "Verified official pack"
+msgstr ""
+
+#: src/pages.ts
+msgid "Sign in with email"
+msgstr ""
+
+#: src/pages.ts
+msgid "Forgot password?"
+msgstr ""
+
+#: src/pages.ts
+msgid "Sign in with a passkey"
+msgstr ""
+
+#: src/pages.ts src/support.ts
+#, python-brace-format
+msgid "Sign in with {provider}"
+msgstr ""
+
+#: src/pages.ts
+msgid "An account is needed to submit packs. Browsing doesn't need one."
+msgstr ""
+
+#: src/passkeys.ts
+msgid "You can register up to 10 passkeys."
+msgstr ""
+
+#: src/profile.ts
+msgid "Use 3–30 letters, numbers or underscores, starting with a letter."
+msgstr ""
+
+#: src/profile.ts
+msgid "That username is reserved."
+msgstr ""
+
+#: src/profile.ts
+msgid "Too many profile updates. Try again in an hour."
+msgstr ""
+
+#: src/profile.ts
+msgid "The upload is too large or invalid."
+msgstr ""
+
+#: src/profile.ts
+msgid "Too many picture changes. Try again in an hour."
+msgstr ""
+
+#: src/profile.ts
+msgid "Choose a picture to upload."
+msgstr ""
+
+#: src/profile.ts
+msgid "Invalid picture."
+msgstr ""
+
+#: src/profile.ts
+msgid "Sign in again before editing your profile."
+msgstr ""
+
+#: src/profile.ts
+msgid "That username is unavailable, or your profile changed. Refresh and try again."
+msgstr ""
+
+#: src/profile.ts
+msgid "Unknown profile update."
+msgstr ""
+
+#: src/profile.ts
+msgid "Save display name"
+msgstr ""
+
+#: src/profile.ts
+msgid "Username"
+msgstr ""
+
+#: src/profile.ts
+msgid "You can change your username at any time."
+msgstr ""
+
+#: src/profile.ts
+msgid "Save username"
+msgstr ""
+
+#: src/profile.ts
+#, python-brace-format
+msgid "View public profile · @{username}"
+msgstr ""
+
+#: src/profile.ts
+msgid "Profile picture"
+msgstr ""
+
+#: src/profile.ts
+msgid "Current profile picture"
+msgstr ""
+
+#: src/profile.ts
+msgid "Upload picture"
+msgstr ""
+
+#: src/profile.ts
+msgid "PNG, JPEG or WebP, up to 5 MiB. Pictures are cropped to a square."
+msgstr ""
+
+#: src/profile.ts
+msgid "Remove picture"
+msgstr ""
+
+#: src/renders.ts
+msgid "Block pictures"
+msgstr ""
+
+#: src/security-unlock.ts
+msgid "This confirmation expired or belongs to another account."
+msgstr ""
+
+#: src/security-unlock.ts
+msgid "Try again"
+msgstr ""
+
+#: src/security-unlock.ts
+msgid "Confirm your identity to continue."
+msgstr ""
+
+#: src/security-unlock.ts
+#, python-brace-format
+msgid "Confirm your identity for {name} to open security settings. Settings lock after 30 minutes of inactivity or one hour total."
+msgstr ""
+
+#: src/security-unlock.ts
+msgid "Password"
+msgstr ""
+
+#: src/security-unlock.ts
+msgid "Continue with password"
+msgstr ""
+
+#: src/security-unlock.ts
+msgid "Unlock with a passkey"
+msgstr ""
+
+#: src/security-unlock.ts
+#, python-brace-format
+msgid "Continue with {provider}"
+msgstr ""
+
+#: src/site-nav.ts
+msgid "Features"
+msgstr ""
+
+#: src/site-nav.ts src/translate.ts
+msgid "Screenshots"
+msgstr ""
+
+#: src/site-nav.ts
+msgid "Changelog"
+msgstr ""
+
+#: src/site-nav.ts
+msgid "Community"
+msgstr ""
+
+#: src/site-nav.ts src/support.ts
+msgid "Support"
+msgstr ""
+
+#: src/site-nav.ts
+msgid "Main"
+msgstr ""
+
+#: src/site-nav.ts
+msgid "Blockwork on GitHub"
+msgstr ""
+
+#: src/site-nav.ts
+msgid "Toggle light/dark theme"
+msgstr ""
+
+#: src/site-nav.ts
+msgid "Footer"
+msgstr ""
+
+#: src/site-nav.ts
+msgid "Source"
+msgstr ""
+
+#: src/site-nav.ts
+msgid "Report an issue"
+msgstr ""
+
+#: src/site-nav.ts
+msgid "All releases"
+msgstr ""
+
+#: src/site-nav.ts
+msgid "Library source"
+msgstr ""
+
+#: src/site-nav.ts
+msgid "Help translate"
+msgstr ""
+
+#: src/support.ts
+msgid "Waiting on us"
+msgstr ""
+
+#: src/support.ts
+msgid "Waiting on you"
+msgstr ""
+
+#: src/support.ts
+msgid "Needs an answer"
+msgstr ""
+
+#: src/support.ts
+msgid "My tickets"
+msgstr ""
+
+#: src/support.ts
+msgid "New ticket"
+msgstr ""
+
+#: src/support.ts
+msgid "Queue"
+msgstr ""
+
+#: src/support.ts
+msgid "Account recovery"
+msgstr ""
+
+#: src/support.ts
+msgid "Blockworked Support"
+msgstr ""
+
+#: src/support.ts
+#, python-brace-format
+msgid "Use your Blockwork community account, or make one by signing in. You can also email {address} without an account."
+msgstr ""
+
+#: src/support.ts
+msgid "Sign in with email or a passkey"
+msgstr ""
+
+#: src/support.ts
+msgid "File a ticket"
+msgstr ""
+
+#: src/support.ts
+msgid "Sign in with your community account and tell us what's up. You can follow it here."
+msgstr ""
+
+#: src/support.ts
+msgid "Email us"
+msgstr ""
+
+#: src/support.ts
+#, python-brace-format
+msgid "Write to {address}. No account needed; we’ll answer by email."
+msgstr ""
+
+#: src/support.ts
+msgid "Questions about Blockwork, the community library or your account? Ask here."
+msgstr ""
+
+#: src/support.ts
+msgid "You haven't filed any tickets."
+msgstr ""
+
+#: src/support.ts
+msgid "Your tickets"
+msgstr ""
+
+#: src/support.ts
+#, python-brace-format
+msgid "Replies go to your account email: {email}."
+msgstr ""
+
+#: src/support.ts
+msgid "Leave blank to read replies in My tickets."
+msgstr ""
+
+#: src/support.ts
+msgid "Subject"
+msgstr ""
+
+#: src/support.ts
+msgid "What's going on?"
+msgstr ""
+
+#: src/support.ts
+msgid "What you were doing, what happened, and your Blockwork version if it's about the app"
+msgstr ""
+
+#: src/support.ts
+msgid "Plain text. Links work."
+msgstr ""
+
+#: src/support.ts
+msgid "Send"
+msgstr ""
+
+#: src/support.ts
+msgid "This account can't file tickets."
+msgstr ""
+
+#: src/support.ts
+msgid "That email address doesn't look right."
+msgstr ""
+
+#: src/support.ts
+msgid "Give it a subject."
+msgstr ""
+
+#: src/support.ts
+msgid "That's a lot of tickets in an hour. Try again later."
+msgstr ""
+
+#: src/support.ts
+msgid "internal note"
+msgstr ""
+
+#: src/support.ts
+msgid "staff"
+msgstr ""
+
+#: src/support.ts
+msgid "Reply"
+msgstr ""
+
+#: src/support.ts
+msgid "Add a reply"
+msgstr ""
+
+#: src/support.ts
+msgid "Plain text. A note stays here and isn't emailed."
+msgstr ""
+
+#: src/support.ts
+msgid "Replying opens the ticket again."
+msgstr ""
+
+#: src/support.ts
+msgid "Add note"
+msgstr ""
+
+#: src/support.ts
+msgid "Send reply"
+msgstr ""
+
+#: src/support.ts
+msgid "by email"
+msgstr ""
+
+#: src/support.ts
+msgid "Reopen"
+msgstr ""
+
+#: src/support.ts
+msgid "Close"
+msgstr ""
+
+#: src/support.ts
+msgid "Mark answered"
+msgstr ""
+
+#: src/support.ts
+msgid "This account was deleted. The ticket is read-only."
+msgstr ""
+
+#: src/support.ts
+msgid "Bad request"
+msgstr ""
+
+#: src/support.ts
+msgid "Nothing waiting. Nice."
+msgstr ""
+
+#: src/support.ts
+msgid "None."
+msgstr ""
+
+#: src/support.ts
+msgid "Support queue"
+msgstr ""
+
+#: src/support.ts
+msgid "Status"
+msgstr ""
+
+#: src/totp.ts
+msgid "Code is invalid, expired or already used. Start sign-in again and use a fresh code."
+msgstr ""
+
+#: src/totp.ts
+msgid "Authenticator apps are not configured yet."
+msgstr ""
+
+#: src/totp.ts
+msgid "Too many attempts. Try again in five minutes."
+msgstr ""
+
+#: src/totp.ts
+msgid "Unlock Account security before changing your authenticator app."
+msgstr ""
+
+#: src/totp.ts
+msgid "Set up an authenticator app"
+msgstr ""
+
+#: src/totp.ts
+msgid "Scan this code in an authenticator app such as Aegis, 2FAS, Google Authenticator, or Microsoft Authenticator."
+msgstr ""
+
+#: src/totp.ts
+msgid "Or enter this setup key manually. Keep it private:"
+msgstr ""
+
+#: src/totp.ts
+msgid "Confirm authenticator app"
+msgstr ""
+
+#: src/totp.ts
+msgid "The app is activated only after you confirm a code. This replaces any existing authenticator app and signs out other browsers and apps."
+msgstr ""
+
+#: src/totp.ts
+msgid "Authenticator app not confirmed"
+msgstr ""
+
+#: src/totp.ts
+msgid "The code was incorrect or expired. Return to the setup page and try a fresh code, or start setup again from Account security."
+msgstr ""
+
+#: src/totp.ts
+msgid "An authenticator app was enabled or replaced on your Blockworked account. Other browsers and apps have been signed out. Save backup codes in Account security."
+msgstr ""
+
+#: src/totp.ts
+msgid "An authenticator app was removed from your Blockworked account. All browsers and apps have been signed out."
+msgstr ""
+
 #: src/translate.ts
 msgid "Translations"
 msgstr ""
 
 #: src/translate.ts
 msgid "Blockworked Translations"
-msgstr ""
-
-#: src/translate.ts
-msgid "Account settings"
 msgstr ""
 
 #: src/translate.ts
@@ -436,19 +1931,11 @@ msgid "Show"
 msgstr ""
 
 #: src/translate.ts
-msgid "Search"
-msgstr ""
-
-#: src/translate.ts
 msgid "Not translated yet"
 msgstr ""
 
 #: src/translate.ts
 msgid "Suggestion"
-msgstr ""
-
-#: src/translate.ts
-msgid "Comment"
 msgstr ""
 
 #: src/translate.ts
@@ -556,10 +2043,6 @@ msgid "Where it appears"
 msgstr ""
 
 #: src/translate.ts
-msgid "Screenshots"
-msgstr ""
-
-#: src/translate.ts
 msgid "Suggestions"
 msgstr ""
 
@@ -608,10 +2091,6 @@ msgstr ""
 
 #: src/translate.ts
 msgid "The English text has a problem"
-msgstr ""
-
-#: src/translate.ts
-msgid "Post comment"
 msgstr ""
 
 #: src/translate.ts
@@ -759,4 +2238,69 @@ msgstr ""
 
 #: src/translate.ts
 msgid "This string changed while you were editing. Your draft is below; compare it with the current translation before saving again."
+msgstr ""
+
+#. Something a block pack can do, listed on its page
+#: src/capabilities.json
+msgid "Runs commands and opens or closes apps"
+msgstr ""
+
+#. Something a block pack can do, listed on its page
+#: src/capabilities.json
+msgid "Reads your saved secrets"
+msgstr ""
+
+#. Something a block pack can do, listed on its page
+#: src/capabilities.json
+msgid "Goes online"
+msgstr ""
+
+#. Something a block pack can do, listed on its page
+#: src/capabilities.json
+msgid "Controls your web browser (clicks, types and reads pages)"
+msgstr ""
+
+#. Something a block pack can do, listed on its page
+#: src/capabilities.json
+msgid "Writes to files"
+msgstr ""
+
+#. Something a block pack can do, listed on its page
+#: src/capabilities.json
+msgid "Reads files and folders"
+msgstr ""
+
+#. Something a block pack can do, listed on its page
+#: src/capabilities.json
+msgid "Presses keys, clicks and moves the mouse"
+msgstr ""
+
+#. Something a block pack can do, listed on its page
+#: src/capabilities.json
+msgid "Reads or changes the clipboard"
+msgstr ""
+
+#. Something a block pack can do, listed on its page
+#: src/capabilities.json
+msgid "Reads or controls other apps and windows"
+msgstr ""
+
+#. Something a block pack can do, listed on its page
+#: src/capabilities.json
+msgid "Starts on its own (schedules, keys, typing, apps, idle, windows, files and more)"
+msgstr ""
+
+#. Something a block pack can do, listed on its page
+#: src/capabilities.json
+msgid "Reads the screen (colors, images and text)"
+msgstr ""
+
+#. Something a block pack can do, listed on its page
+#: src/capabilities.json
+msgid "Runs or stops your other macros"
+msgstr ""
+
+#. Something a block pack can do, listed on its page
+#: src/capabilities.json
+msgid "Reads or changes global variables"
 msgstr ""

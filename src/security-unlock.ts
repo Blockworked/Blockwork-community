@@ -1,3 +1,4 @@
+import { t, tn, tp } from './i18n.ts';
 import type { Env } from './index.ts';
 import { cookie, cookies, hash, safeNext, type User, PROVIDERS } from './auth.ts';
 import { esc } from './pages.ts';
@@ -23,11 +24,11 @@ export async function securityUnlock(req: Request, env: Env, user: User | null):
   if (url.pathname === '/account/unlock/complete') {
     const token = url.searchParams.get('token') ?? '';
     const flow = cookie(req, COOKIE) === token ? await readFlow(env, token, 'settings-unlock') : null;
-    if (!flow || flow.user_id !== user.id) return accountPage(user, env, 'Unlock security settings', '<p>This confirmation expired or belongs to another account. <a href="/account/unlock">Try again</a>.</p>', 400);
+    if (!flow || flow.user_id !== user.id) return accountPage(user, env, tp('Unlock security settings'), `<p>${t('This confirmation expired or belongs to another account.')} <a href="/account/unlock">${t('Try again')}</a>.</p>`, 400);
     const data = JSON.parse(flow.data);
     const hasFactor = await env.DB.prepare('SELECT 1 FROM passkeys WHERE user_id = ? UNION ALL SELECT 1 FROM totp_credentials WHERE user_id = ? LIMIT 1').bind(user.id, user.id).first();
     if (session.token_hash === data.session_hash || session.created_at < data.started_at || !['strong','totp','recovery', ...(!hasFactor ? ['primary'] : [])].includes(session.auth_strength)) {
-      return accountPage(user, env, 'Unlock security settings', '<p>Confirm your identity to continue. <a href="/account/unlock">Try again</a>.</p>', 403);
+      return accountPage(user, env, tp('Unlock security settings'), `<p>${t('Confirm your identity to continue.')} <a href="/account/unlock">${t('Try again')}</a>.</p>`, 403);
     }
     const now = Date.now();
     const results = await env.DB.batch([
@@ -49,10 +50,10 @@ export async function securityUnlock(req: Request, env: Env, user: User | null):
   const email = await env.DB.prepare('SELECT email FROM email_credentials WHERE user_id = ?').bind(user.id).first<{email: string}>();
   const providers = await env.DB.prepare('SELECT provider FROM oauth_identities WHERE user_id = ?').bind(user.id).all<{provider: keyof typeof PROVIDERS}>();
   const key = await env.DB.prepare('SELECT 1 FROM passkeys WHERE user_id = ?').bind(user.id).first();
-  const response = settingsPage(user, env, 'Security', `<h3>Unlock security settings</h3><p>Confirm your identity for ${esc(user.name)} to open security settings. Settings lock after 30 minutes of inactivity or one hour total.</p>
-    ${email ? `<form method="post" action="/auth/email/login"><input type="hidden" name="email" value="${esc(email.email)}"><input type="hidden" name="next" value="${esc(complete)}"><p><label>Password <input name="password" type="password" autocomplete="current-password" required maxlength="128"></label></p><button>Continue with password</button></form>` : ''}
-    ${key ? `<p><button type="button" data-passkey="login" data-next="${esc(complete)}">Unlock with a passkey</button></p>` : ''}
-    <div class="signin">${providers.results.map(p => `<a class="button" href="/auth/${p.provider}/login?next=${encodeURIComponent(complete)}">Continue with ${esc(PROVIDERS[p.provider])}</a>`).join('')}</div>
+  const response = settingsPage(user, env, 'Security', `<h3>${t('Unlock security settings')}</h3><p>${t('Confirm your identity for {name} to open security settings. Settings lock after 30 minutes of inactivity or one hour total.', { name: user.name })}</p>
+    ${email ? `<form method="post" action="/auth/email/login"><input type="hidden" name="email" value="${esc(email.email)}"><input type="hidden" name="next" value="${esc(complete)}"><p><label>${t('Password')} <input name="password" type="password" autocomplete="current-password" required maxlength="128"></label></p><button>${t('Continue with password')}</button></form>` : ''}
+    ${key ? `<p><button type="button" data-passkey="login" data-next="${esc(complete)}">${t('Unlock with a passkey')}</button></p>` : ''}
+    <div class="signin">${providers.results.map(p => `<a class="button" href="/auth/${p.provider}/login?next=${encodeURIComponent(complete)}">${t('Continue with {provider}', { provider: PROVIDERS[p.provider] })}</a>`).join('')}</div>
     <p id="auth-status" role="status"></p><script src="/account.js" defer></script>`);
   response.headers.append('Set-Cookie', reauthCookie(token));
   return response;

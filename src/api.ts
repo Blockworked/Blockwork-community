@@ -1,3 +1,4 @@
+import { t, tn, tp } from './i18n.ts';
 import { notify } from "./notifications.ts";
 // What Blockwork's Block library talks to: sign-in through the browser
 // (a loopback redirect with PKCE), then JSON over a bearer token for pack
@@ -63,15 +64,14 @@ function loopback(ask: LoginAsk, query: Record<string, string>): string {
 /** GET /app/login: asks the signed-in account whether Blockwork may act for it. */
 export function appLoginPage(user: User | null, url: URL): Response {
   const ask = readLoginAsk(url.searchParams);
-  if (!ask) return page("Sign in to Blockwork", user, false, `<h1>Sign in to Blockwork</h1><p>That sign-in link isn't right. Start again from Blockwork.</p>`, 400);
+  if (!ask) return page(tp("Sign in to Blockwork"), user, false, `<h1>Sign in to Blockwork</h1><p>That sign-in link isn't right. Start again from Blockwork.</p>`, 400);
   if (!user) {
     return new Response(null, { status: 302, headers: { Location: `/login?next=${encodeURIComponent(url.pathname + url.search)}` } });
   }
   const hidden = Object.entries({ port: String(ask.port), state: ask.state, challenge: ask.challenge, label: ask.label })
     .map(([k, v]) => `<input type="hidden" name="${k}" value="${esc(v)}">`)
     .join("");
-  const res = page(
-    "Sign in to Blockwork",
+  const res = page(tp("Sign in to Blockwork"),
     user,
     false,
     `<section class="app-signin"><h1>Sign in to Blockwork?</h1>
@@ -90,7 +90,7 @@ export function appLoginPage(user: User | null, url: URL): Response {
 /** POST /app/login: makes a one-time code and hands it to the app. */
 export async function appLoginConfirm(req: Request, env: Env, user: User | null): Promise<Response> {
   const ask = readLoginAsk(await req.formData());
-  if (!ask) return page("Sign in to Blockwork", user, false, `<h1>Sign in to Blockwork</h1><p>That sign-in link isn't right. Start again from Blockwork.</p>`, 400);
+  if (!ask) return page(tp("Sign in to Blockwork"), user, false, `<h1>Sign in to Blockwork</h1><p>That sign-in link isn't right. Start again from Blockwork.</p>`, 400);
   if (!user) return new Response(null, { status: 303, headers: { Location: "/login" } });
   const code = randomToken();
   const sessionHashes = await Promise.all(cookies(req, "session").slice(0, 2).map(hash));

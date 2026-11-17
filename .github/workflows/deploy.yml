@@ -43,6 +43,8 @@ jobs:
           cache: npm
 
       - run: npm ci
+      # Translators work from locales/community.pot; a string added without re-extracting would stay English.
+      - run: npm run i18n:check
       - run: npm run typecheck
       - run: npm test
       - uses: actions/setup-python@v5

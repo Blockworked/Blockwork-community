@@ -1,5 +1,6 @@
 // Server-rendered HTML. Every value goes through esc().
 
+import { language, t, tn, tp } from './i18n.ts';
 import type { User } from "./auth.ts";
 import { PROVIDERS } from "./auth.ts";
 import { CAPABILITIES } from "./packs.ts";
@@ -39,17 +40,17 @@ const STYLE = `
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25); --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
   --radius: 6px; --radius-lg: 14px;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --font: "Atkinson Hyperlegible Next", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, monospace;
+  --font: tp("Atkinson Hyperlegible Next"), -apple-system, BlinkMacSystemFont, tp("Segoe UI"), system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", tp("Cascadia Code"), tp("JetBrains Mono"), Menlo, monospace;
 }
 :root[data-theme="light"] {${LIGHT}
 }
 @media (prefers-color-scheme: light) { :root:not([data-theme]) {${LIGHT}
 } }
-@font-face { font-family: "Atkinson Hyperlegible Next"; font-style: normal; font-weight: 200 800; font-display: swap; src: url(/fonts/atkinson-hyperlegible-next-normal-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: "Atkinson Hyperlegible Next"; font-style: normal; font-weight: 200 800; font-display: swap; src: url(/fonts/atkinson-hyperlegible-next-normal-latin-ext.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
-@font-face { font-family: "Atkinson Hyperlegible Next"; font-style: italic; font-weight: 200 800; font-display: swap; src: url(/fonts/atkinson-hyperlegible-next-italic-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: "Atkinson Hyperlegible Next"; font-style: italic; font-weight: 200 800; font-display: swap; src: url(/fonts/atkinson-hyperlegible-next-italic-latin-ext.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: tp("Atkinson Hyperlegible Next"); font-style: normal; font-weight: 200 800; font-display: swap; src: url(/fonts/atkinson-hyperlegible-next-normal-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: tp("Atkinson Hyperlegible Next"); font-style: normal; font-weight: 200 800; font-display: swap; src: url(/fonts/atkinson-hyperlegible-next-normal-latin-ext.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: tp("Atkinson Hyperlegible Next"); font-style: italic; font-weight: 200 800; font-display: swap; src: url(/fonts/atkinson-hyperlegible-next-italic-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: tp("Atkinson Hyperlegible Next"); font-style: italic; font-weight: 200 800; font-display: swap; src: url(/fonts/atkinson-hyperlegible-next-italic-latin-ext.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
 * { box-sizing: border-box; }
 html { scrollbar-width: thin; }
 body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); color: var(--fg); font: 15px/1.55 var(--font); -webkit-font-smoothing: antialiased; }
@@ -164,15 +165,15 @@ export interface Shell {
 
 export function libraryShell(user: User | null, admin: boolean): Shell {
   const nav = user
-    ? `<a href="/translate">Translate</a><a href="/submit">Submit a pack</a><a href="/me">My packs</a><a href="/account">Account settings</a>${admin ? `<a href="/admin">Review</a>` : ""}
+    ? `<a href="/translate">${t('Translate')}</a><a href="/submit">${t('Submit a pack')}</a><a href="/me">${t('My packs')}</a><a href="/account">${t('Account settings')}</a>${admin ? `<a href="/admin">${t('Review')}</a>` : ""}
        <span class="who">${user.avatar ? `<img class="avatar" src="${esc(user.avatar)}" alt="">` : ""}${esc(user.name)}</span>
-       <form class="inline" method="post" action="/auth/logout"><button class="ghost">Sign out</button></form>`
-    : `<a href="/translate">Translate</a><a href="/login">Sign in</a>`;
-  return { name: "Community blocks", href: "/", nav, site: "Blockwork community blocks" };
+       <form class="inline" method="post" action="/auth/logout"><button class="ghost">${t('Sign out')}</button></form>`
+    : `<a href="/translate">${t('Translate')}</a><a href="/login">${t('Sign in')}</a>`;
+  return { name: tp("Community blocks"), href: "/", nav, site: tp("Blockwork community blocks") };
 }
 
 export function page(title: string, user: User | null, admin: boolean, body: string, status = 200, shell = libraryShell(user, admin)): Response {
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  const html = `<!doctype html><html lang="${language().tag}" dir="${language().dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)} | ${esc(shell.site)}</title><link rel="icon" type="image/png" href="/favicon.png">
 <meta name="theme-color" content="#1c1c1e" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f2f2f5" media="(prefers-color-scheme: light)">
 <script src="/site.js"></script><style>${STYLE}</style></head>
@@ -184,38 +185,37 @@ ${siteFooter(shell.place)}</body></html>`;
 }
 
 export function capabilityList(kinds: string[]): string {
-  if (!kinds.length) return `<p class="muted">Doesn't use any blocks that need permission.</p>`;
+  if (!kinds.length) return `<p class="muted">${t('Doesn\'t use any blocks that need permission.')}</p>`;
   const items = CAPABILITIES.filter(([k]) => kinds.includes(k)).map(
-    ([, label, risky]) => `<li${risky ? ` class="risky"` : ""}>${esc(label)}</li>`,
+    ([, label, risky]) => `<li${risky ? ` class="risky"` : ""}>${esc(tp(label))}</li>`,
   );
   return `<ul class="caps">${items.join("")}</ul>`;
 }
 
 /** The checkmark next to the author of a pack published by the Blockworked team. */
 export function verifiedBadge(): string {
-  return `<span class="verified" title="Verified official pack" role="img" aria-label="Verified official pack"><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="currentColor"/><path d="M4.6 8.3l2.2 2.2 4.6-4.8" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+  return `<span class="verified" title="${t('Verified official pack')}" role="img" aria-label="${t('Verified official pack')}"><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="currentColor"/><path d="M4.6 8.3l2.2 2.2 4.6-4.8" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
 }
 
 function input(name: string, label: string, type = 'text', autocomplete = name): string {
   return `<p><label>${esc(label)}<br><input name="${esc(name)}" type="${type}" autocomplete="${autocomplete}" required ${type === 'password' ? 'minlength="15" maxlength="128"' : 'maxlength="254"'}></label></p>`;
 }
 export function emailLogin(next: string): string {
-  return `<div class="card"><h2>Sign in with email</h2><form method="post" action="/auth/email/login">
+  return `<div class="card"><h2>${t('Sign in with email')}</h2><form method="post" action="/auth/email/login">
     <input type="hidden" name="next" value="${esc(next)}">${input('email', 'Email', 'email', 'username')}${input('password', 'Password', 'password', 'current-password')}
-    <button class="primary">Sign in</button></form><p><a href="/auth/email/signup">Create an account</a> · <a href="/auth/email/forgot">Forgot password?</a></p></div>
-    <button type="button" data-passkey="login" data-next="${esc(next || '/account/security')}">Sign in with a passkey</button><p id="auth-status" role="status"></p><script src="/account.js" defer></script>`;
+    <button class="primary">${t('Sign in')}</button></form><p><a href="/auth/email/signup">${t('Create an account')}</a> · <a href="/auth/email/forgot">${t('Forgot password?')}</a></p></div>
+    <button type="button" data-passkey="login" data-next="${esc(next || '/account/security')}">${t('Sign in with a passkey')}</button><p id="auth-status" role="status"></p><script src="/account.js" defer></script>`;
 }
 
 export function loginPage(user: User | null, next: string, local = false): Response {
   const q = next ? `?next=${encodeURIComponent(next)}` : "";
   const buttons = Object.entries(PROVIDERS)
-    .map(([id, name]) => `<a class="button large" href="/auth/${id}/login${q}">Sign in with ${esc(name)}</a>`)
+    .map(([id, name]) => `<a class="button large" href="/auth/${id}/login${q}">${t("Sign in with {provider}", { provider: name })}</a>`)
     .join("");
-  return page(
-    "Sign in",
+  return page(tp("Sign in"),
     user,
     false,
-    `<h1>Sign in</h1><p class="muted">An account is needed to submit packs. Browsing doesn't need one.</p><div class="signin">${buttons}</div>${local ? emailLogin(next) : ""}`,
+    `<h1>${t('Sign in')}</h1><p class="muted">${t('An account is needed to submit packs. Browsing doesn\'t need one.')}</p><div class="signin">${buttons}</div>${local ? emailLogin(next) : ""}`,
   );
 }
 

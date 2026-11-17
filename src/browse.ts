@@ -1,6 +1,7 @@
 // Browsing the library: search and filters on the home page, a page per pack
 // with its blocks, versions and comments, its source, and a page per author.
 
+import { language, raw, t, tn, tp } from './i18n.ts';
 import type { User } from "./auth.ts";
 import type { Env } from "./index.ts";
 import { capabilityList, esc, message, page, verifiedBadge } from "./pages.ts";
@@ -85,11 +86,11 @@ export async function withBlockViews<T extends { id: number; sha256: string; blo
 // Search and filters
 
 export const SORTS = [
-  ["match", "Best match"],
-  ["name", "Name"],
-  ["updated", "Recently updated"],
-  ["new", "Newest"],
-  ["discussed", "Most discussed"],
+  ["match", tp("Best match")],
+  ["name", tp("Name")],
+  ["updated", tp("Recently updated")],
+  ["new", tp("Newest")],
+  ["discussed", tp("Most discussed")],
 ] as const;
 export type Sort = (typeof SORTS)[number][0];
 
@@ -156,10 +157,9 @@ export function filterPacks<T extends ListedPack>(packs: T[], f: Filters): T[] {
 // Pieces
 
 export function date(ms: number): string {
-  return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  return new Date(ms).toLocaleDateString(language().tag === "en" ? "en-US" : language().tag, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export function authorLink(name: string, publicId: string | null | undefined, official: boolean): string {
   const label = `${esc(name)}${official ? verifiedBadge() : ""}`;
@@ -179,32 +179,32 @@ export function listedCard(p: ListedPack): string {
   const count = (JSON.parse(p.blocks) as string[]).length;
   return `<article class="card pack">
     <div class="pack-head"><h3><a href="${href}">${esc(p.name)}</a> <span class="version">${esc(p.version)}</span></h3>
-      ${p.comments ? `<a class="count" href="${href}#comments" title="${plural(p.comments, "comment")}">${COMMENT_ICON}${p.comments}</a>` : ""}</div>
-    <p class="muted by meta"><span>by ${authorLink(p.author, p.author_username || p.author_public_id, p.owner_id === OFFICIAL_OWNER)}</span><span>${plural(count, "block")}</span><span>updated ${date(p.submitted_at)}</span></p>
+      ${p.comments ? `<a class="count" href="${href}#comments" title="${tn("{n} comment", "{n} comments", p.comments)}">${COMMENT_ICON}${p.comments}</a>` : ""}</div>
+    <p class="muted by meta"><span>${t("by {author}", { author: raw(authorLink(p.author, p.author_username || p.author_public_id, p.owner_id === OFFICIAL_OWNER)) })}</span><span>${tn("{n} block", "{n} blocks", count)}</span><span>${t("updated {date}", { date: date(p.submitted_at) })}</span></p>
     <p>${esc(p.description)}</p>${blockPictures(p)}${capabilityList(JSON.parse(p.capabilities))}</article>`;
 }
 
 function select(name: string, current: string, options: readonly (readonly [string, string])[]): string {
   return `<select name="${name}">${options
-    .map(([v, l]) => `<option value="${esc(v)}"${v === current ? " selected" : ""}>${esc(l)}</option>`)
+    .map(([v, l]) => `<option value="${esc(v)}"${v === current ? " selected" : ""}>${esc(tp(l))}</option>`)
     .join("")}</select>`;
 }
 
 function filterForm(f: Filters): string {
   const uses: [string, string][] = [
-    ["", "Any permissions"],
-    ["none", "Needs no permissions"],
-    ["safe", "Nothing risky"],
+    ["", tp("Any permissions")],
+    ["none", tp("Needs no permissions")],
+    ["safe", tp("Nothing risky")],
     ...CAPABILITIES.map(([k, label]): [string, string] => [k, label]),
   ];
   return `<form class="filters" method="get" action="/" role="search">
     <div class="search"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.5 10.5l3.2 3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-      <input type="search" name="q" value="${esc(f.q)}" placeholder="Search packs, blocks and authors" aria-label="Search packs" maxlength="100"></div>
+      <input type="search" name="q" value="${esc(f.q)}" placeholder="${t('Search packs, blocks and authors')}" aria-label="${t('Search packs')}" maxlength="100"></div>
     <div class="filter-row">
-      <label><span class="sr">Permissions</span>${select("uses", f.uses, uses)}</label>
-      <label><span class="sr">Sort by</span>${select("sort", f.sort, SORTS)}</label>
-      <label class="check"><input type="checkbox" name="official" value="1"${f.official ? " checked" : ""}> Official only</label>
-      <button class="primary">Search</button>
+      <label><span class="sr">${t('Permissions')}</span>${select("uses", f.uses, uses)}</label>
+      <label><span class="sr">${t('Sort by')}</span>${select("sort", f.sort, SORTS)}</label>
+      <label class="check"><input type="checkbox" name="official" value="1"${f.official ? " checked" : ""}> ${t('Official only')}</label>
+      <button class="primary">${t('Search')}</button>
     </div></form>`;
 }
 
@@ -216,18 +216,18 @@ export async function home(env: Env, user: User | null, admin: boolean, params: 
   const shown = filterPacks(all, f);
   const filtered = !!(f.q || f.uses || f.official);
   const summary = filtered
-    ? `<p class="results muted meta"><span>${plural(shown.length, "pack")} of ${all.length}</span><a href="/">Clear filters</a></p>`
-    : `<p class="results muted">${plural(all.length, "pack")}</p>`;
+    ? `<p class="results muted meta"><span>${tn("{n} pack of {total}", "{n} packs of {total}", shown.length, { total: all.length })}</span><a href="/">${t('Clear filters')}</a></p>`
+    : `<p class="results muted">${tn("{n} pack", "{n} packs", all.length)}</p>`;
   const list = shown.length
     ? shown.map(listedCard).join("")
-    : `<div class="empty"><p>${filtered ? "No packs match that." : "No packs yet."}</p>${filtered ? `<p><a href="/">See every pack</a></p>` : ""}</div>`;
+    : `<div class="empty"><p>${filtered ? tp("No packs match that.") : tp("No packs yet.")}</p>${filtered ? `<p><a href="/">${t('See every pack')}</a></p>` : ""}</div>`;
   return page(
     f.q ? `Search: ${f.q}` : "Packs",
     user,
     admin,
-    `<section class="hero"><h1>Community blocks</h1>
-     <p>Packs of blocks people made for Blockwork.</p>
-     <p class="actions"><a class="button primary large" href="/submit">Submit a pack</a><span>Install packs in Blockwork from <kbd>My Blocks${CHEVRON}Browse</kbd></span></p></section>
+    `<section class="hero"><h1>${t('Community blocks')}</h1>
+     <p>${t('Packs of blocks people made for Blockwork.')}</p>
+     <p class="actions"><a class="button primary large" href="/submit">${t('Submit a pack')}</a><span>${t('Install packs in Blockwork from {place}', { place: raw(`<kbd>${t('My Blocks')}${CHEVRON}${t('Browse')}</kbd>`) })}</span></p></section>
      ${filterForm(f)}${summary}<div class="pack-list">${list}</div>${await backgroundRenders(env, admin)}`,
   );
 }
@@ -267,14 +267,14 @@ function packHeader(p: ListedPack, current: "overview" | "source", versionNote =
     `<a href="${href}"${key === current ? ` aria-current="page"` : ""}>${label}</a>`;
   return `<p class="crumbs"><a href="/">${BACK}All packs</a></p>
     <div class="pack-title"><h1>${esc(p.name)} <span class="version">${esc(p.version)}</span></h1>
-      <p class="actions"><a class="button" href="/packs/${p.sha256}.json" download="${esc(p.pack_id)}.blockpack">Download</a></p></div>
-    <p class="muted by meta"><span>by ${authorLink(p.author, p.author_username || p.author_public_id, p.owner_id === OFFICIAL_OWNER)}</span><span>updated ${date(p.submitted_at)}</span><span>first shared ${date(p.pack_created_at)}</span>${versionNote}</p>
-    <nav class="tabs" aria-label="Pack">${tab("overview", base, "Overview")}${tab("source", `${base}/source`, "Source")}${tab("comments", `${base}#comments`, `Comments <span class="n">${p.comments}</span>`)}</nav>`;
+      <p class="actions"><a class="button" href="/packs/${p.sha256}.json" download="${esc(p.pack_id)}.blockpack">${t('Download')}</a></p></div>
+    <p class="muted by meta"><span>${t("by {author}", { author: raw(authorLink(p.author, p.author_username || p.author_public_id, p.owner_id === OFFICIAL_OWNER)) })}</span><span>${t("updated {date}", { date: date(p.submitted_at) })}</span><span>${t("first shared {date}", { date: date(p.pack_created_at) })}</span>${versionNote}</p>
+    <nav class="tabs" aria-label="${t('Pack')}">${tab("overview", base, "Overview")}${tab("source", `${base}/source`, "Source")}${tab("comments", `${base}#comments`, `Comments <span class="n">${p.comments}</span>`)}</nav>`;
 }
 
 export async function packPage(env: Env, user: User | null, admin: boolean, id: string, error = "", draft = ""): Promise<Response> {
   const p = await listedPack(env, id);
-  if (!p) return message(user, admin, "Not found", "That pack isn't in the library.", 404);
+  if (!p) return message(user, admin, tp("Not found"), tp("That pack isn't in the library."), 404);
   const [text, versions] = await Promise.all([packJson(env, p.sha256), approvedVersions(env, p.pack_id)]);
   const blocks = packSource(parse(text));
   const blockList = blocks
@@ -287,7 +287,7 @@ export async function packPage(env: Env, user: User | null, admin: boolean, id: 
     .map(
       (v, i) => `<li><span class="v">${esc(v.version || v.sha256.slice(0, 8))}</span>${i === 0 ? ` <span class="mark latest">${CHECK}latest</span>` : ""}
         <span class="muted">${date(v.reviewed_at ?? v.submitted_at)}</span>
-        <span class="links"><a href="/packs/${encodeURIComponent(p.pack_id)}/source?v=${v.sha256}">source</a> <a href="/packs/${v.sha256}.json" download="${esc(p.pack_id)}-${esc(v.version || v.sha256.slice(0, 8))}.blockpack">file</a></span></li>`,
+        <span class="links"><a href="/packs/${encodeURIComponent(p.pack_id)}/source?v=${v.sha256}">${t('source')}</a> <a href="/packs/${v.sha256}.json" download="${esc(p.pack_id)}-${esc(v.version || v.sha256.slice(0, 8))}.blockpack">${t('file')}</a></span></li>`,
     )
     .join("");
   return page(
@@ -297,10 +297,10 @@ export async function packPage(env: Env, user: User | null, admin: boolean, id: 
     `${packHeader(p, "overview")}
      <p class="lede">${esc(p.description)}</p>
      <p class="hint">To add it, open Blockwork and go to My Blocks &gt; Browse library.</p>
-     <h2>What it can do</h2>${capabilityList(JSON.parse(p.capabilities))}
-     <h2>${plural(blocks.length, "block")}</h2><ul class="block-list">${blockList}</ul>
-     <p class="see-how"><a href="/packs/${encodeURIComponent(p.pack_id)}/source">See how they work</a></p>
-     <h2>Versions</h2><ul class="versions">${versionList}</ul>
+     <h2>${t('What it can do')}</h2>${capabilityList(JSON.parse(p.capabilities))}
+     <h2>${tn("{n} block", "{n} blocks", blocks.length)}</h2><ul class="block-list">${blockList}</ul>
+     <p class="see-how"><a href="/packs/${encodeURIComponent(p.pack_id)}/source">${t('See how they work')}</a></p>
+     <h2>${t('Versions')}</h2><ul class="versions">${versionList}</ul>
      ${await commentsSection(env, user, admin, p, error, draft)}${await backgroundRenders(env, admin)}`,
   );
 }
@@ -313,18 +313,18 @@ export function sourceView(
   links: { blocks: string; json: string; file: string; render?: string },
   title: string,
 ): string {
-  const tabs = `<nav class="tabs small" aria-label="Source view">
-    <a href="${links.blocks}"${view === "blocks" ? ` aria-current="page"` : ""}>Blocks</a>
-    <a href="${links.json}"${view === "json" ? ` aria-current="page"` : ""}>Pack file</a>
-    <a class="end" href="${links.file}">Raw</a></nav>`;
-  if (text === null) return `${tabs}<p class="muted">The pack file is missing.</p>`;
+  const tabs = `<nav class="tabs small" aria-label="${t('Source view')}">
+    <a href="${links.blocks}"${view === "blocks" ? ` aria-current="page"` : ""}>${t('Blocks')}</a>
+    <a href="${links.json}"${view === "json" ? ` aria-current="page"` : ""}>${t('Pack file')}</a>
+    <a class="end" href="${links.file}">${t('Raw')}</a></nav>`;
+  if (text === null) return `${tabs}<p class="muted">${t('The pack file is missing.')}</p>`;
   if (view === "json") return `${tabs}<pre class="code"><code>${highlightJson(text.slice(0, 400_000))}</code></pre>`;
   return `${tabs}${viewer(env, links.file, title, links.render)}`;
 }
 
 export async function sourcePage(env: Env, user: User | null, admin: boolean, id: string, params: URLSearchParams): Promise<Response> {
   const p = await listedPack(env, id);
-  if (!p) return message(user, admin, "Not found", "That pack isn't in the library.", 404);
+  if (!p) return message(user, admin, tp("Not found"), tp("That pack isn't in the library."), 404);
   let sha = p.sha256;
   let note = "";
   const asked = params.get("v");
@@ -332,9 +332,9 @@ export async function sourcePage(env: Env, user: User | null, admin: boolean, id
     const old = await env.DB.prepare("SELECT version FROM versions WHERE pack_id = ? AND sha256 = ? AND status = 'approved'")
       .bind(p.pack_id, asked)
       .first<{ version: string }>();
-    if (!old) return message(user, admin, "Not found", "That version isn't in the library.", 404);
+    if (!old) return message(user, admin, tp("Not found"), tp("That version isn't in the library."), 404);
     sha = asked;
-    note = `<span>showing version ${esc(old.version || asked.slice(0, 8))} (<a href="/packs/${encodeURIComponent(p.pack_id)}/source">see current</a>)</span>`;
+    note = `<span>${t('showing version {version} ({link})', { version: old.version || asked.slice(0, 8), link: raw(`<a href="/packs/${encodeURIComponent(p.pack_id)}/source">${t('see current')}</a>`) })}</span>`;
   }
   const view = params.get("view") === "json" ? "json" : "blocks";
   const base = `/packs/${encodeURIComponent(p.pack_id)}/source${sha === p.sha256 ? "" : `?v=${sha}`}`;
@@ -351,7 +351,7 @@ export async function authorPage(env: Env, user: User | null, admin: boolean, sl
   const author = await env.DB.prepare(`SELECT id, name, avatar, username, public_id, created_at FROM users WHERE ${usernameOnly ? "username = ? COLLATE NOCASE" : "(username = ? COLLATE NOCASE OR public_id = ?)"} AND banned = 0 AND deactivated_at = 0 AND deleted_at = 0 ORDER BY CASE WHEN public_id = ? COLLATE NOCASE THEN 0 ELSE 1 END LIMIT 1`)
     .bind(...(usernameOnly ? [slug,slug] : [slug,slug,slug]))
     .first<{ id: string; name: string; avatar: string; username: string | null; public_id: string; created_at: number }>();
-  if (!author) return message(user, admin, "Not found", "There's no one here by that name.", 404);
+  if (!author) return message(user, admin, tp("Not found"), tp("There's no one here by that name."), 404);
   const canonical = `/authors/${author.username || author.public_id}`;
   if (usernameOnly || slug !== (author.username || author.public_id)) return new Response(null, {status:302,headers:{Location:canonical,'Cache-Control':'no-store'}});
   const { results } = await env.DB.prepare(`${LISTED} AND p.owner_id = ? ORDER BY v.submitted_at DESC`).bind(author.id).all<ListedPack>();
@@ -363,14 +363,14 @@ export async function authorPage(env: Env, user: User | null, admin: boolean, sl
     admin,
     `<p class="crumbs"><a href="/">${BACK}All packs</a></p>
      <div class="profile">${avatar}<div><h1>${esc(author.name)}${official ? verifiedBadge() : ""}</h1>${author.username ? `<p class="muted">@${esc(author.username)}</p>` : ""}
-     <p class="muted">${official ? "The Blockworked team's official packs." : `Sharing blocks since ${date(author.created_at)}.`} ${plural(results.length, "pack")}.</p></div></div>
-     <div class="pack-list">${results.map(listedCard).join("") || `<p class="muted">No packs listed yet.</p>`}</div>`,
+     <p class="muted">${official ? t("The Blockworked team’s official packs.") : t("Sharing blocks since {date}.", { date: date(author.created_at) })} ${tn("{n} pack.", "{n} packs.", results.length)}</p></div></div>
+     <div class="pack-list">${results.map(listedCard).join("") || `<p class="muted">${t('No packs listed yet.')}</p>`}</div>`,
   );
 }
 
 /** A pack version as a card in the admin and "My packs" lists. */
 export function packCard(v: VersionRow, extra = ""): string {
   return `<div class="card"><h3>${esc(v.name)} <span class="version">${esc(v.version)}</span></h3>
-    <p class="muted by">by ${esc(v.author)}${v.owner_id === OFFICIAL_OWNER ? verifiedBadge() : ""}</p><p>${esc(v.description)}</p>
+    <p class="muted by">${t("by {author}", { author: v.author })}${v.owner_id === OFFICIAL_OWNER ? verifiedBadge() : ""}</p><p>${esc(v.description)}</p>
     ${blockPictures(v)}${capabilityList(JSON.parse(v.capabilities))}${extra}</div>`;
 }

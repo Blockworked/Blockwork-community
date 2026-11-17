@@ -1,6 +1,7 @@
 // Checks an uploaded block pack and works out what its blocks can do,
 // mirroring blockwork-core's read_pack and its capability table.
 
+import { t, tn, tp } from './i18n.ts';
 import capabilityTable from "./capabilities.json" with { type: "json" };
 
 export const MAX_PACK_BYTES = 2 * 1024 * 1024;
@@ -127,34 +128,34 @@ export function capabilities(blocks: unknown): string[] {
 
 /** Parses an upload, or says why it can't be accepted. */
 export function readPack(bytes: Uint8Array, username?: string): PackMeta | string {
-  if (bytes.byteLength > MAX_PACK_BYTES) return "That file is over 2 MB.";
+  if (bytes.byteLength > MAX_PACK_BYTES) return tp("That file is over 2 MB.");
   let value: any;
   try {
     value = JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes));
   } catch {
-    return "That isn't a block pack. Make one in Blockwork with \"Share blocks as a pack...\".";
+    return tp("That isn't a block pack. Make one in Blockwork with \"Share blocks as a pack...\".");
   }
   if (!value || typeof value !== "object" || !("blockwork_block_pack" in value)) {
-    return "That isn't a block pack. Make one in Blockwork with \"Share blocks as a pack...\".";
+    return tp("That isn't a block pack. Make one in Blockwork with \"Share blocks as a pack...\".");
   }
-  if (value.blockwork_block_pack !== 1) return "This pack was made by a newer version of Blockwork than the library supports.";
+  if (value.blockwork_block_pack !== 1) return tp("This pack was made by a newer version of Blockwork than the library supports.");
   const name = typeof value.name === "string" ? value.name.trim() : "";
-  if (!name) return "The pack has no name.";
-  if (name.length > 80) return "The pack's name is over 80 characters.";
+  if (!name) return tp("The pack has no name.");
+  if (name.length > 80) return tp("The pack's name is over 80 characters.");
   const rawId = typeof value.id === "string" && value.id.trim() ? value.id : name;
   const id = slug(rawId);
-  if (!id) return "The pack's id is empty.";
+  if (!id) return tp("The pack's id is empty.");
   if (id !== rawId) return `The pack's id should be "${id}". Share it again from Blockwork to fix it.`;
-  if (id.length > 64) return "The pack's id is over 64 characters.";
+  if (id.length > 64) return tp("The pack's id is over 64 characters.");
   const description = typeof value.description === "string" ? value.description.trim() : "";
-  if (description.length > 500) return "The description is over 500 characters.";
+  if (description.length > 500) return tp("The description is over 500 characters.");
   const version = typeof value.version === "string" ? value.version.trim() : "";
-  if (version.length > 32) return "The version is over 32 characters.";
+  if (version.length > 32) return tp("The version is over 32 characters.");
   const defs = value.blocks?.block_defs;
-  if (!Array.isArray(defs) || defs.length === 0) return "The pack has no blocks.";
-  if (defs.length > 200) return "The pack has over 200 blocks.";
-  if (defs.some((d: any) => typeof d?.id !== "string" || !Array.isArray(d?.pieces))) return "The pack's blocks are broken.";
-  if (defs.some((d: any) => d.identifier != null && typeof d.identifier !== "string")) return "The pack's blocks are broken.";
+  if (!Array.isArray(defs) || defs.length === 0) return tp("The pack has no blocks.");
+  if (defs.length > 200) return tp("The pack has over 200 blocks.");
+  if (defs.some((d: any) => typeof d?.id !== "string" || !Array.isArray(d?.pieces))) return tp("The pack's blocks are broken.");
+  if (defs.some((d: any) => d.identifier != null && typeof d.identifier !== "string")) return tp("The pack's blocks are broken.");
   // A file the library already stamped can come back, but only with this uploader's own name in front.
   const own = username === undefined ? null : `${idPart(username) || "Community"}${ID_SEPARATOR}`;
   const colon = defs.find((d: any) => {
@@ -205,7 +206,7 @@ export function stampPack(bytes: Uint8Array, username: string): Uint8Array | str
     const out = new TextEncoder().encode(JSON.stringify(value, null, indent) + "\n");
     if (out.byteLength <= MAX_PACK_BYTES) return out;
   }
-  return "That file is over 2 MB.";
+  return tp("That file is over 2 MB.");
 }
 
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {

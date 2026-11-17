@@ -4,6 +4,7 @@
 // lists show pictures that same viewer drew, which an admin's browser saves
 // when it opens the version for review, or any page while some are missing.
 
+import { t, tn, tp } from './i18n.ts';
 import type { User } from "./auth.ts";
 import type { Env } from "./index.ts";
 import { esc, page } from "./pages.ts";
@@ -181,10 +182,9 @@ export async function rendersPage(env: Env, user: User, admin: boolean): Promise
   const results = await unrendered(env);
   const redraw = `<form method="post" action="/admin/renders/redraw"><p><button>Redraw every picture</button></p></form>`;
   if (!results.length) {
-    return page("Block pictures", user, admin, `<h1>Block pictures</h1><p>Every version has its pictures.</p>${redraw}`);
+    return page(tp("Block pictures"), user, admin, `<h1>Block pictures</h1><p>Every version has its pictures.</p>${redraw}`);
   }
-  return page(
-    "Block pictures",
+  return page(tp("Block pictures"),
     user,
     admin,
     `<h1>Block pictures</h1>

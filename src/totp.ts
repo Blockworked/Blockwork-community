@@ -1,3 +1,4 @@
+import { t, tn, tp } from './i18n.ts';
 import * as OTPAuth from 'otpauth';
 import qrcode from 'qrcode-generator';
 import type { Env } from './index.ts';
@@ -35,7 +36,7 @@ export function acceptedStep(secret: string, token: string, now = Date.now()): n
   const delta = totp(secret).validate({token, timestamp: now, window: 1});
   return delta === null ? null : Math.floor(now / 30000) + delta;
 }
-const fail = (text = 'Code is invalid, expired or already used. Start sign-in again and use a fresh code.') => json({error: text}, 400);
+const fail = (text = tp('Code is invalid, expired or already used. Start sign-in again and use a fresh code.')) => json({error: text}, 400);
 async function sessionJson(env: Env, user: string, version: number, next: string): Promise<Response> {
   const response = await issueSession(env, user, version, 'totp', next);
   if (response.status !== 303) return fail();
@@ -45,12 +46,12 @@ async function sessionJson(env: Env, user: string, version: number, next: string
   return new Response(JSON.stringify({next: destination}), {headers});
 }
 export async function totpRoute(req: Request, env: Env, path: string, body: Record<string, unknown>, user: User | null): Promise<Response> {
-  if (!env.AUTH_TOTP_KEY) return json({error: 'Authenticator apps are not configured yet.'}, 503);
+  if (!env.AUTH_TOTP_KEY) return json({error: tp('Authenticator apps are not configured yet.')}, 503);
   const code = typeof body.code === 'string' ? body.code.trim() : '';
   if (path === '/auth/totp/verify') {
     const flow = await readFlow(env, flowToken(req), 'second-factor');
     if (!flow?.user_id) return fail();
-    if (!await limit(env, 'totp-user', flow.user_id, 8, 300)) return json({error: 'Too many attempts. Try again in five minutes.'}, 429);
+    if (!await limit(env, 'totp-user', flow.user_id, 8, 300)) return json({error: tp('Too many attempts. Try again in five minutes.')}, 429);
     const row = await env.DB.prepare('SELECT encrypted_secret, last_step FROM totp_credentials WHERE user_id = ?').bind(flow.user_id)
       .first<{encrypted_secret: string; last_step: number}>();
     if (!row) return fail();
@@ -67,7 +68,7 @@ export async function totpRoute(req: Request, env: Env, path: string, body: Reco
     return sessionJson(env, flow.user_id, flow.auth_version, JSON.parse(flow.data).next);
   }
   const proof = user ? await securitySession(req, env, user) : null;
-  if (!user || !proof) return json({error: 'Unlock Account security before changing your authenticator app.'}, 401);
+  if (!user || !proof) return json({error: tp('Unlock Account security before changing your authenticator app.')}, 401);
   if (path === '/account/totp/setup') {
     const secret = new OTPAuth.Secret({size: 20}).base32;
     const encrypted = await sealSecret(env, user.id, secret);
@@ -75,21 +76,21 @@ export async function totpRoute(req: Request, env: Env, path: string, body: Reco
     if (!await securityProof(req, env, user)) return fail();
     const qr = qrcode(0, 'M');
     qr.addData(totp(secret, user.name).toString()); qr.make();
-    const response = accountPage(user, env, 'Set up an authenticator app', `<p>Scan this code in an authenticator app such as Aegis, 2FAS, Google Authenticator, or Microsoft Authenticator.</p>
+    const response = accountPage(user, env, tp('Set up an authenticator app'), `<p>${t('Scan this code in an authenticator app such as Aegis, 2FAS, Google Authenticator, or Microsoft Authenticator.')}</p>
       <div style="background:white;color:black;width:min(100%,320px);padding:12px">${qr.createSvgTag({scalable: true})}</div>
-      <p>Or enter this setup key manually. Keep it private:</p><pre>${esc(secret)}</pre>
-      <form method="post" action="/account/totp/confirm"><p><label>Six-digit code <input name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" required></label></p><button>Confirm authenticator app</button></form>
-      <p>The app is activated only after you confirm a code. This replaces any existing authenticator app and signs out other browsers and apps.</p>`);
+      <p>${t('Or enter this setup key manually. Keep it private:')}</p><pre>${esc(secret)}</pre>
+      <form method="post" action="/account/totp/confirm"><p><label>${t('Six-digit code')} <input name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" required></label></p><button>${t('Confirm authenticator app')}</button></form>
+      <p>${t('The app is activated only after you confirm a code. This replaces any existing authenticator app and signs out other browsers and apps.')}</p>`);
     response.headers.append('Set-Cookie', flowCookie(token, 600, '__Host-totp-enroll'));
     return response;
   }
   if (path === '/account/totp/confirm') {
-    if (!await limit(env, 'totp-enroll-user', user.id, 8, 300)) return fail('Too many attempts. Try again in five minutes.');
+    if (!await limit(env, 'totp-enroll-user', user.id, 8, 300)) return fail(tp('Too many attempts. Try again in five minutes.'));
     const flow = await readFlow(env, flowToken(req, '__Host-totp-enroll'), 'totp-enroll');
     if (!flow || flow.user_id !== user.id) return fail();
     const encrypted = JSON.parse(flow.data).encrypted;
     const step = acceptedStep(await openSecret(env, user.id, encrypted), code);
-    if (step === null) return accountPage(user, env, 'Authenticator app not confirmed', '<p>The code was incorrect or expired. Return to the setup page and try a fresh code, or start setup again from Account security.</p>', 400);
+    if (step === null) return accountPage(user, env, tp('Authenticator app not confirmed'), `<p>${t('The code was incorrect or expired. Return to the setup page and try a fresh code, or start setup again from Account security.')}</p>`, 400);
     const now = Date.now();
     const exists = 'EXISTS (SELECT 1 FROM auth_flows f JOIN users u ON u.id = f.user_id WHERE f.token_hash = ? AND f.expires_at > ? AND u.auth_version = f.auth_version AND u.banned = 0)';
     const guard = 'EXISTS (SELECT 1 FROM auth_flows WHERE token_hash = ? AND expires_at > ?)';
@@ -103,7 +104,7 @@ export async function totpRoute(req: Request, env: Env, path: string, body: Reco
       env.DB.prepare(`DELETE FROM auth_flows WHERE user_id = ? AND ${guard}`).bind(user.id, flow.token_hash, now),
     ]);
     if (results[0].meta.changes !== 1) return fail();
-    await notify(env, user.id, 'An authenticator app was enabled or replaced on your Blockworked account. Other browsers and apps have been signed out. Save backup codes in Account security.');
+    await notify(env, user.id, tp('An authenticator app was enabled or replaced on your Blockworked account. Other browsers and apps have been signed out. Save backup codes in Account security.'));
     return issueSession(env, user.id, flow.auth_version + 1, 'totp', '/account/security', proof.security_unlocked_at);
   }
   if (path === '/account/totp/delete') {
@@ -122,8 +123,8 @@ export async function totpRoute(req: Request, env: Env, path: string, body: Reco
       env.DB.prepare(`DELETE FROM auth_flows WHERE user_id = ? AND ${guard}`).bind(user.id, flow.token_hash, now),
     ]);
     if (results[0].meta.changes !== 1) return fail();
-    await notify(env, user.id, 'An authenticator app was removed from your Blockworked account. All browsers and apps have been signed out.');
+    await notify(env, user.id, tp('An authenticator app was removed from your Blockworked account. All browsers and apps have been signed out.'));
     return new Response(null, {status: 303, headers: {Location: '/login?next=%2Faccount%2Fsecurity'}});
   }
-  return json({error: 'Not found'}, 404);
+  return json({error: tp('Not found')}, 404);
 }

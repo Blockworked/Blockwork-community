@@ -209,7 +209,7 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
   if (method === 'GET' && (m = path.match(/^\/@([A-Za-z][A-Za-z0-9_]{2,29})$/))) return authorPage(env,user,admin,m[1],true);
   if (method === 'GET' && (m = path.match(/^\/authors\/([A-Za-z0-9_]{1,32})$/))) return authorPage(env,user,admin,m[1]);
   if (method === "POST" && (m = path.match(/^\/comments\/(\d+)\/delete$/))) {
-    if (!user) return message(user, admin, "Not found", "That comment doesn't exist.", 404);
+    if (!user) return message(user, admin, tp("Not found"), tp("That comment doesn't exist."), 404);
     return deleteComment(env, user, admin, Number(m[1]));
   }
   if (path === "/app/login") {
@@ -230,7 +230,7 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
   }
 
   if (path.startsWith("/admin")) {
-    if (!admin || !user) return message(user, admin, "Not found", "There's nothing here.", 404);
+    if (!admin || !user) return message(user, admin, tp("Not found"), tp("There's nothing here."), 404);
     if (method === "GET" && path === "/admin") return reviewQueue(env, user, admin);
     if (method === "GET" && path === "/admin/renders") return rendersPage(env, user, admin);
     if (method === "POST" && path === "/admin/renders/redraw") return redraw(env);
@@ -243,7 +243,7 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
     if (method === "POST" && (m = path.match(/^\/admin\/packs\/([^/]+)$/))) return setListed(req, env, decodeURIComponent(m[1]));
     if (method === "POST" && (m = path.match(/^\/admin\/users\/([^/]+)$/))) return setBanned(req, env, decodeURIComponent(m[1]));
   }
-  return message(user, admin, "Not found", "There's nothing here.", 404);
+  return message(user, admin, tp("Not found"), tp("There's nothing here."), 404);
 }
 
 async function indexJson(env: Env): Promise<Response> {
@@ -293,8 +293,7 @@ function png(base64: string): Response {
 }
 
 function submitForm(user: User, admin: boolean, error = ""): Response {
-  return page(
-    "Submit a pack",
+  return page(tp("Submit a pack"),
     user,
     admin,
     `<h1>Submit a pack</h1>
@@ -339,5 +338,5 @@ async function myPacks(env: Env, user: User, admin: boolean): Promise<Response> 
       ),
     )
     .join("");
-  return page("My packs", user, admin, `<h1>My packs</h1>${list || `<p class="muted">You haven't submitted any packs.</p>`}`);
+  return page(tp("My packs"), user, admin, `<h1>My packs</h1>${list || `<p class="muted">You haven't submitted any packs.</p>`}`);
 }

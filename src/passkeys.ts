@@ -1,3 +1,4 @@
+import { tp } from './i18n.ts';
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse,
   type AuthenticationResponseJSON, type RegistrationResponseJSON, type AuthenticatorTransport } from '@simplewebauthn/server';
 import type { Env } from './index.ts';
@@ -11,7 +12,7 @@ export function json(data: unknown, status = 200, token?: string): Response {
   if (token !== undefined) headers.set('Set-Cookie', flowCookie(token, token ? 600 : 0, '__Host-passkey-flow'));
   return new Response(JSON.stringify(data), {status, headers});
 }
-const fail = () => json({error: 'Verification expired or failed. Sign in and try again.'}, 400);
+const fail = () => json({error: tp('Verification expired or failed. Sign in and try again.')}, 400);
 function rp(env: Env): { rpID: string; expectedOrigin: string } {
   const url = new URL(env.SITE_URL);
   return {rpID: url.hostname, expectedOrigin: url.origin};
@@ -63,10 +64,10 @@ export async function passkeyRoute(req: Request, env: Env, path: string, body: R
   if (path === '/auth/passkey/register-options' || path === '/auth/passkey/register-verify') {
     const user = await currentUser(req, env);
     const proof = user ? await securitySession(req, env, user) : null;
-    if (!user || !proof) return json({error: 'Unlock Account security before changing security settings.'}, 401);
+    if (!user || !proof) return json({error: tp('Unlock Account security before changing security settings.')}, 401);
     if (path.endsWith('register-options')) {
       const keys = await env.DB.prepare('SELECT id FROM passkeys WHERE user_id = ?').bind(user.id).all<Key>();
-      if (keys.results.length >= 10) return json({error: 'You can register up to 10 passkeys.'}, 400);
+      if (keys.results.length >= 10) return json({error: tp('You can register up to 10 passkeys.')}, 400);
       const options = await generateRegistrationOptions({rpName: 'Blockworked', rpID,
         // An opaque, stable handle under WebAuthn's 64-byte limit, also for provider-based IDs.
         userID: unhex(await hash(user.id)), userName: user.name,
@@ -108,5 +109,5 @@ export async function passkeyRoute(req: Request, env: Env, path: string, body: R
     await notify(env, flow.user_id, 'A backup code was used to sign in to your Blockworked account. If a device was lost, add a replacement passkey and remove the old one in Account security.');
     return complete(env, flow, flow.user_id, 'recovery', JSON.parse(flow.data).next);
   }
-  return json({error: 'Not found'}, 404);
+  return json({error: tp('Not found')}, 404);
 }

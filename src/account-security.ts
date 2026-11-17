@@ -1,4 +1,5 @@
 // Shared authentication primitives. No secrets are kept in Worker memory between requests.
+import { tp } from './i18n.ts';
 import { scryptAsync } from '@noble/hashes/scrypt.js';
 import { cookie, cookies, hash, randomToken, safeNext, sessionCookies, type User } from './auth.ts';
 import type { Env } from './index.ts';
@@ -6,7 +7,7 @@ import type { Env } from './index.ts';
 export const PASSWORD_OPTIONS = { N: 32768, r: 8, p: 3, dkLen: 32, maxmem: 48 * 1024 * 1024 };
 const encoder = new TextEncoder();
 export function passwordError(password: string): string | null {
-  if ([...password].length < 15 || [...password].length > 128 || encoder.encode(password).length > 512) return 'Use a password between 15 and 128 characters.';
+  if ([...password].length < 15 || [...password].length > 128 || encoder.encode(password).length > 512) return tp('Use a password between 15 and 128 characters.');
   return null;
 }
 export function hex(bytes: Uint8Array): string {
@@ -84,14 +85,14 @@ export async function issueSession(env: Env, id: string, authVersion: number, st
   let unlock = target.origin === new URL(env.SITE_URL).origin && target.pathname === '/account/security' ? (unlockedAt ?? now) : 0;
   if (target.pathname === '/account/unlock/complete') {
     const intent = await readFlow(env, target.searchParams.get('token') ?? '', 'settings-unlock');
-    if (!intent || intent.user_id !== id || intent.auth_version !== authVersion) return new Response('Use a sign-in method belonging to this account.', {status: 403});
+    if (!intent || intent.user_id !== id || intent.auth_version !== authVersion) return new Response(tp('Use a sign-in method belonging to this account.'), {status: 403});
     // The completion endpoint verifies this fresh session against its browser-bound intent.
     unlock = 0;
   }
   const result = await env.DB.prepare(`INSERT INTO sessions (token_hash, user_id, expires_at, created_at, auth_strength, security_unlocked_at, security_last_used_at)
     SELECT ?, id, ?, ?, ?, ?, ? FROM users WHERE id = ? AND auth_version = ? AND banned = 0 AND deactivated_at = 0 AND deleted_at = 0`)
     .bind(await hash(token), now + 30 * 86400_000, now, strength, unlock, unlock ? now : 0, id, authVersion).run();
-  if (result.meta.changes !== 1) return new Response('Sign-in expired. Try again.', { status: 401 });
+  if (result.meta.changes !== 1) return new Response(tp('Sign-in expired. Try again.'), { status: 401 });
   const headers = new Headers({ Location: safeNext(next, env), 'Cache-Control': 'no-store' });
   for (const c of sessionCookies(env, token, 30 * 86400)) headers.append('Set-Cookie', c);
   headers.append('Set-Cookie', flowCookie('', 0));
@@ -101,10 +102,10 @@ export async function issueSession(env: Env, id: string, authVersion: number, st
 export async function finishPrimary(env: Env, id: string, authVersion: number, next: string): Promise<Response> {
   const enrolled = await env.DB.prepare('SELECT 1 FROM passkeys WHERE user_id = ? UNION ALL SELECT 1 FROM totp_credentials WHERE user_id = ? LIMIT 1').bind(id, id).first();
   if (!enrolled) return issueSession(env, id, authVersion, 'primary', next);
-  if (await version(env, id) !== authVersion) return new Response('Sign-in expired. Try again.', { status: 401 });
+  if (await version(env, id) !== authVersion) return new Response(tp('Sign-in expired. Try again.'), { status: 401 });
   const token = await makeFlow(env, 'second-factor', id, { next });
   // makeFlow captures the current version; don't upgrade a stale primary proof after a reset.
-  if (await version(env, id) !== authVersion) return new Response('Sign-in expired. Try again.', { status: 401 });
+  if (await version(env, id) !== authVersion) return new Response(tp('Sign-in expired. Try again.'), { status: 401 });
   return redirect('/auth/second-factor', token);
 }
 export const SECURITY_IDLE_MS = 30 * 60_000;
@@ -174,10 +175,10 @@ export async function newPasswordError(password: string): Promise<string | null>
     });
     if (!response.ok) throw new Error('Password screening unavailable');
     if ((await response.text()).split('\n').some(line => line.trim().split(':')[0] === digest.slice(5) && Number(line.trim().split(':')[1]) > 0)) {
-      return 'This password appears in known breaches. Choose a different password.';
+      return tp('This password appears in known breaches. Choose a different password.');
     }
     return null;
-  } catch { return 'Password safety checks are temporarily unavailable. Try again later.'; }
+  } catch { return tp('Password safety checks are temporarily unavailable. Try again later.'); }
 }
 
 /** All dependent credentials are invalidated in the same D1 transaction as a password change. */

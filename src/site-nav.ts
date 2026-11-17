@@ -5,6 +5,7 @@
 // and styles) and src/layouts/Base.astro (the theme and fade scripts). Change
 // both together.
 
+import { language, languages, t, tn, tp } from './i18n.ts';
 import { esc } from "./pages.ts";
 
 let mainUrl = "https://blockworked.com";
@@ -20,6 +21,16 @@ export function setMainSite(url: string | undefined, support?: string, translate
   if (translate) translateUrl = translate.replace(/\/$/, "");
 }
 
+/** A menu of the languages the site is translated into; hidden until there is a choice. */
+function languagePicker(): string {
+  const list = languages();
+  if (list.length < 2) return "";
+  const current = language().code;
+  return `<label class="language-picker"><span class="sr">${t("Language")}</span><select data-language-picker aria-label="${t("Language")}">${list
+    .map((l) => `<option value="${esc(l.code)}" lang="${esc(l.tag)}"${l.code === current ? " selected" : ""}>${esc(l.name)}</option>`)
+    .join("")}</select></label>`;
+}
+
 /** Where the community library's links point from the page being drawn:
  *  "/" on the library itself, its full address from the helpdesk. */
 export interface NavPlace {
@@ -33,13 +44,13 @@ const REPO_URL = "https://github.com/Blockworked/Blockwork";
 
 function navLinks(place: NavPlace): { href: string; label: string; current?: boolean }[] {
   return [
-    { href: `${mainUrl}/#features`, label: "Features" },
-    { href: `${mainUrl}/#screenshots`, label: "Screenshots" },
-    { href: `${mainUrl}/download`, label: "Download" },
-    { href: `${mainUrl}/changelog`, label: "Changelog" },
-    { href: place.community, label: "Community", current: place.section === "community" },
-    { href: `${supportUrl}/`, label: "Support", current: place.section === "support" },
-    { href: `${translateUrl}/`, label: "Translate", current: place.section === "translations" },
+    { href: `${mainUrl}/#features`, label: tp("Features") },
+    { href: `${mainUrl}/#screenshots`, label: tp("Screenshots") },
+    { href: `${mainUrl}/download`, label: tp("Download") },
+    { href: `${mainUrl}/changelog`, label: tp("Changelog") },
+    { href: place.community, label: tp("Community"), current: place.section === "community" },
+    { href: `${supportUrl}/`, label: tp("Support"), current: place.section === "support" },
+    { href: `${translateUrl}/`, label: tp("Translate"), current: place.section === "translations" },
   ];
 }
 
@@ -57,10 +68,10 @@ export function siteHeader(place = LIBRARY): string {
     .join("");
   return `<header class="site-header"><div class="container site-header-inner">
 <a class="brand" href="${esc(mainUrl)}/"><img src="/logo.png" alt="" width="28" height="28"><span>Blockwork</span></a>
-<nav class="site-nav" aria-label="Main">${links}</nav>
+<nav class="site-nav" aria-label="${t('Main')}">${links}</nav>
 <div class="site-header-actions">
-<a class="btn btn-icon btn-ghost" href="${REPO_URL}" title="Blockwork on GitHub" aria-label="Blockwork on GitHub">${GITHUB}</a>
-<button class="btn btn-icon btn-ghost theme-toggle" type="button" title="Toggle light/dark theme" aria-label="Toggle light/dark theme">${SUN}${MOON}</button>
+<a class="btn btn-icon btn-ghost" href="${REPO_URL}" title="${t('Blockwork on GitHub')}" aria-label="${t('Blockwork on GitHub')}">${GITHUB}</a>
+<button class="btn btn-icon btn-ghost theme-toggle" type="button" title="${t('Toggle light/dark theme')}" aria-label="${t('Toggle light/dark theme')}">${SUN}${MOON}</button>
 <a class="btn btn-primary header-cta" href="${esc(mainUrl)}/download">${DOWNLOAD}Download</a>
 </div></div></header>`;
 }
@@ -69,11 +80,11 @@ export function siteFooter(place = LIBRARY): string {
   const year = new Date().getFullYear();
   return `<footer class="site-footer"><div class="container site-footer-inner">
 <a class="footer-brand" href="${esc(mainUrl)}/"><img src="/logo.png" alt="" width="22" height="22"><span>Blockwork</span></a>
-<nav class="footer-links" aria-label="Footer">
-<a href="${esc(mainUrl)}/download">Download</a><a href="${esc(mainUrl)}/changelog">Changelog</a><a href="${esc(place.community)}">Community blocks</a><a href="${esc(supportUrl)}/">Support</a>
-<a href="${REPO_URL}">Source</a><a href="${REPO_URL}/issues">Report an issue</a><a href="${REPO_URL}/releases">All releases</a>
-<a href="https://github.com/Blockworked/Blockwork-community">Library source</a>
-</nav><p class="copyright">© ${year} Blockworked</p></div></footer>`;
+<nav class="footer-links" aria-label="${t('Footer')}">
+<a href="${esc(mainUrl)}/download">${t('Download')}</a><a href="${esc(mainUrl)}/changelog">${t('Changelog')}</a><a href="${esc(place.community)}">${t('Community blocks')}</a><a href="${esc(supportUrl)}/">${t('Support')}</a>
+<a href="${REPO_URL}">${t('Source')}</a><a href="${REPO_URL}/issues">${t('Report an issue')}</a><a href="${REPO_URL}/releases">${t('All releases')}</a>
+<a href="https://github.com/Blockworked/Blockwork-community">${t('Library source')}</a><a href="${esc(translateUrl)}/">${t('Help translate')}</a>
+</nav>${languagePicker()}<p class="copyright">© ${year} Blockworked</p></div></footer>`;
 }
 
 /** Header and footer styles, matching blockworked.com's SiteHeader and
@@ -116,6 +127,9 @@ export const SITE_NAV_CSS = `
 .footer-links a { color: var(--muted); }
 .footer-links a:hover { color: var(--fg); text-decoration: none; }
 .site-footer .copyright { margin: 0 0 0 auto; color: var(--muted); }
+.language-picker select { font: inherit; font-size: 13px; min-height: 28px; padding: 0 6px; border-radius: var(--radius); border: 1px solid var(--glass-border); background: transparent; color: var(--muted); }
+.language-picker select:hover { color: var(--fg); }
+.site-footer .sr, .language-picker .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* Moving between pages: a cross-fade within the site (the header keeps its
    place), and a fade of everything under the header when crossing to or from
@@ -143,6 +157,13 @@ export const SITE_JS = `(function () {
     var next = root.dataset.theme === 'light' ? 'dark' : 'light';
     root.dataset.theme = next;
     document.cookie = 'bw-theme=' + next + '; path=/; max-age=31536000; samesite=lax' + domain;
+  });
+
+  // The language both sites show; the main site keeps it in its paths too.
+  document.addEventListener('change', function (e) {
+    if (!e.target.matches || !e.target.matches('[data-language-picker]')) return;
+    document.cookie = 'bw-lang=' + e.target.value + '; path=/; max-age=31536000; samesite=lax' + domain;
+    location.reload();
   });
 
   var arriving = /(?:^|; )bw-xsite=1/.test(document.cookie);

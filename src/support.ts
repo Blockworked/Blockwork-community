@@ -1,3 +1,4 @@
+import { t as tt, tn, tp, raw } from './i18n.ts';
 import { notify } from "./notifications.ts";
 import { formImages, imageField, mailImages, storeImages, type ImageAttachment, type StoredImage } from "./support-attachments.ts";
 // The helpdesk at support.blockworked.com. Anyone signed in to the community
@@ -20,8 +21,8 @@ import {
 } from "./support-mail.ts";
 
 export type Status = "open" | "answered" | "closed";
-const STATUS_LABEL: Record<Status, string> = { open: "Waiting on us", answered: "Waiting on you", closed: "Closed" };
-const STAFF_LABEL: Record<Status, string> = { open: "Needs an answer", answered: "Answered", closed: "Closed" };
+const STATUS_LABEL: Record<Status, string> = { open: tp("Waiting on us"), answered: tp("Waiting on you"), closed: "Closed" };
+const STAFF_LABEL: Record<Status, string> = { open: tp("Needs an answer"), answered: "Answered", closed: "Closed" };
 
 export const NEW_TICKETS_PER_HOUR = 5;
 const MAX_SUBJECT = 200;
@@ -85,11 +86,11 @@ function redirect(location: string): Response {
 function shell(env: Env, user: User | null, staff: boolean): Shell {
   const login = link(env, "/login");
   const nav = user
-    ? `<a href="${link(env, "/")}">My tickets</a><a href="${link(env, "/new")}">New ticket</a><a href="${esc(env.SITE_URL)}/account">Account settings</a>${staff ? `<a href="${link(env, "/queue")}">Queue</a><a href="${esc(env.SITE_URL)}/staff/accounts">Account recovery</a>` : ""}
+    ? `<a href="${link(env, "/")}">${tt('My tickets')}</a><a href="${link(env, "/new")}">${tt('New ticket')}</a><a href="${esc(env.SITE_URL)}/account">${tt('Account settings')}</a>${staff ? `<a href="${link(env, "/queue")}">${tt('Queue')}</a><a href="${esc(env.SITE_URL)}/staff/accounts">${tt('Account recovery')}</a>` : ""}
        <span class="who">${user.avatar ? `<img class="avatar" src="${esc(user.avatar)}" alt="">` : ""}${esc(user.name)}</span>
-       <form class="inline" method="post" action="${link(env, "/logout")}"><button class="ghost">Sign out</button></form>`
-    : `<a href="${esc(login)}">Sign in</a>`;
-  return { name: "Support", href: link(env, "/"), nav, site: "Blockworked Support", place: { community: `${env.SITE_URL}/`, section: "support" } };
+       <form class="inline" method="post" action="${link(env, "/logout")}"><button class="ghost">${tt('Sign out')}</button></form>`
+    : `<a href="${esc(login)}">${tt('Sign in')}</a>`;
+  return { name: "Support", href: link(env, "/"), nav, site: tp("Blockworked Support"), place: { community: `${env.SITE_URL}/`, section: "support" } };
 }
 
 function when(ms: number): string {
@@ -148,36 +149,33 @@ function loginPage(env: Env, user: User | null, staff: boolean, next: string): R
   if (user) return redirect(link(env, path));
   const back = encodeURIComponent(link(env, path));
   const buttons = Object.entries(PROVIDERS)
-    .map(([id, name]) => `<a class="button large" href="${esc(`${env.SITE_URL}/auth/${id}/login?next=${back}`)}">Sign in with ${esc(name)}</a>`)
+    .map(([id, name]) => `<a class="button large" href="${esc(`${env.SITE_URL}/auth/${id}/login?next=${back}`)}">${tt('Sign in with {provider}', { provider: name })}</a>`)
     .join("");
-  return page(
-    "Sign in",
+  return page(tp("Sign in"),
     null,
     false,
-    `<h1>Sign in</h1><p class="muted">Use your Blockwork community account, or make one by signing in. You can also email
-     <a href="mailto:${esc(fromAddress(env))}">${esc(fromAddress(env))}</a> without an account.</p><div class="signin">${buttons}${env.LOCAL_AUTH_ENABLED === "true" ? `<a class="button large" href="${esc(`${env.SITE_URL}/login?next=${back}`)}">Sign in with email or a passkey</a>` : ""}</div>`,
+    `<h1>${tt('Sign in')}</h1><p class="muted">${tt('Use your Blockwork community account, or make one by signing in. You can also email {address} without an account.', { address: raw(`<a href="mailto:${esc(fromAddress(env))}">${esc(fromAddress(env))}</a>`) })}</p><div class="signin">${buttons}${env.LOCAL_AUTH_ENABLED === "true" ? `<a class="button large" href="${esc(`${env.SITE_URL}/login?next=${back}`)}">${tt('Sign in with email or a passkey')}</a>` : ""}</div>`,
     200,
     shell(env, null, false),
   );
 }
 
 function notFound(env: Env, user: User | null, staff: boolean): Response {
-  return page("Not found", user, staff, `<h1>Not found</h1><p>There's nothing here.</p>`, 404, shell(env, user, staff));
+  return page(tp("Not found"), user, staff, `<h1>${tt('Not found')}</h1><p>${tt('There\'s nothing here.')}</p>`, 404, shell(env, user, staff));
 }
 
 async function home(env: Env, user: User | null, staff: boolean): Promise<Response> {
   const email = esc(fromAddress(env));
   const ways = `<div class="ways">
-    <div class="card"><h3>File a ticket</h3><p class="muted">Sign in with your community account and tell us what's up. You can follow it here.</p>
-      <p><a class="button primary" href="${link(env, "/new")}">New ticket</a></p></div>
-    <div class="card"><h3>Email us</h3><p class="muted">Write to <a href="mailto:${email}">${email}</a>. No account needed; we'll answer by email.</p></div>
+    <div class="card"><h3>${tt('File a ticket')}</h3><p class="muted">${tt('Sign in with your community account and tell us what\'s up. You can follow it here.')}</p>
+      <p><a class="button primary" href="${link(env, "/new")}">${tt('New ticket')}</a></p></div>
+    <div class="card"><h3>${tt('Email us')}</h3><p class="muted">${tt('Write to {address}. No account needed; we’ll answer by email.', { address: raw(`<a href="mailto:${email}">${email}</a>`) })}</p></div>
   </div>`;
   if (!user) {
-    return page(
-      "Support",
+    return page(tp("Support"),
       null,
       false,
-      `<h1>Support</h1><p class="muted">Questions about Blockwork, the community library or your account? Ask here.</p>${ways}`,
+      `<h1>${tt('Support')}</h1><p class="muted">${tt('Questions about Blockwork, the community library or your account? Ask here.')}</p>${ways}`,
       200,
       shell(env, null, false),
     );
@@ -185,12 +183,11 @@ async function home(env: Env, user: User | null, staff: boolean): Promise<Respon
   const { results } = await env.DB.prepare("SELECT * FROM tickets WHERE user_id = ? ORDER BY updated_at DESC LIMIT 200").bind(user.id).all<Ticket>();
   const list = results.length
     ? `<ul class="ticket-list">${results.map((t) => ticketRow(env, t, false)).join("")}</ul>`
-    : `<p class="muted">You haven't filed any tickets.</p>`;
-  return page(
-    "Support",
+    : `<p class="muted">${tt('You haven\'t filed any tickets.')}</p>`;
+  return page(tp("Support"),
     user,
     staff,
-    `<h1>Support</h1>${ways}<h2>Your tickets</h2>${list}
+    `<h1>${tt('Support')}</h1>${ways}<h2>${tt('Your tickets')}</h2>${list}
      <p class="muted">Tickets you emailed in are answered by email; their links open them here.</p>`,
     200,
     shell(env, user, staff),
@@ -204,22 +201,21 @@ function ticketRow(env: Env, t: Ticket, staff: boolean): string {
 
 async function newForm(env: Env, user: User, staff: boolean, error = "", draft: { subject?: string; body?: string; email?: string } = {}, savedEmail = ""): Promise<Response> {
   const attached = await env.DB.prepare("SELECT email FROM email_credentials WHERE user_id = ?").bind(user.id).first<{email:string}>();
-  return page(
-    "New ticket",
+  return page(tp("New ticket"),
     user,
     staff,
-    `<h1>New ticket</h1>
+    `<h1>${tt('New ticket')}</h1>
      <form class="support-form comment-form" enctype="multipart/form-data" method="post" action="${link(env, "/new")}">
        ${error ? `<p class="risky">${esc(error)}</p>` : ""}
-       ${attached ? `<p class="muted">Replies go to your account email: ${esc(attached.email)}.</p>` : `<label class="field" for="email">Email (optional)</label>
+       ${attached ? `<p class="muted">${tt('Replies go to your account email: {email}.', { email: attached.email })}</p>` : `<label class="field" for="email">Email (optional)</label>
        <input type="email" id="email" name="email" maxlength="254" autocomplete="email" value="${esc(draft.email ?? savedEmail)}">
-       <p class="muted">Leave blank to read replies in My tickets.</p>`}
-       <label class="field" for="subject">Subject</label>
+       <p class="muted">${tt('Leave blank to read replies in My tickets.')}</p>`}
+       <label class="field" for="subject">${tt('Subject')}</label>
        <input type="text" id="subject" name="subject" required maxlength="${MAX_SUBJECT}" value="${esc(draft.subject ?? "")}">
-       <label class="field" for="body">What's going on?</label>
-       <textarea id="body" name="body" required maxlength="${MAX_BODY}" placeholder="What you were doing, what happened, and your Blockwork version if it's about the app">${esc(draft.body ?? "")}</textarea>
+       <label class="field" for="body">${tt('What\'s going on?')}</label>
+       <textarea id="body" name="body" required maxlength="${MAX_BODY}" placeholder="${tt('What you were doing, what happened, and your Blockwork version if it\'s about the app')}">${esc(draft.body ?? "")}</textarea>
        ${imageField}
-       <p class="form-foot"><span class="muted">Plain text. Links work.</span><button class="primary">Send</button></p>
+       <p class="form-foot"><span class="muted">${tt('Plain text. Links work.')}</span><button class="primary">${tt('Send')}</button></p>
      </form>`,
     error ? 400 : 200,
     shell(env, user, staff),
@@ -238,15 +234,15 @@ async function createFromForm(req: Request, env: Env, user: User, staff: boolean
   const subject = String(form.get("subject") ?? "").replace(/\s+/g, " ").trim();
   const body = tidy(String(form.get("body") ?? ""));
   const draft = { email, subject, body };
-  if (user.banned) return newForm(env, user, staff, "This account can't file tickets.", draft);
-  if (email && !isEmail(email)) return newForm(env, user, staff, "That email address doesn't look right.", draft);
-  if (!subject) return newForm(env, user, staff, "Give it a subject.", draft);
+  if (user.banned) return newForm(env, user, staff, tp("This account can't file tickets."), draft);
+  if (email && !isEmail(email)) return newForm(env, user, staff, tp("That email address doesn't look right."), draft);
+  if (!subject) return newForm(env, user, staff, tp("Give it a subject."), draft);
   if (subject.length > MAX_SUBJECT) return newForm(env, user, staff, `Subjects can be up to ${MAX_SUBJECT} characters.`, draft);
-  if (!body) return newForm(env, user, staff, "Write something first.", draft);
+  if (!body) return newForm(env, user, staff, tp("Write something first."), draft);
   const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM tickets WHERE user_id = ? AND created_at > ?")
     .bind(user.id, Date.now() - 3600_000)
     .first<{ n: number }>();
-  if (!staff && (recent?.n ?? 0) >= NEW_TICKETS_PER_HOUR) return newForm(env, user, staff, "That's a lot of tickets in an hour. Try again later.", draft);
+  if (!staff && (recent?.n ?? 0) >= NEW_TICKETS_PER_HOUR) return newForm(env, user, staff, tp("That's a lot of tickets in an hour. Try again later."), draft);
   let images: ImageAttachment[];
   try { images = await formImages(form); } catch (error) { return newForm(env, user, staff, (error as Error).message, draft); }
   await env.DB.prepare("UPDATE users SET support_email = ? WHERE id = ? AND deactivated_at = 0 AND deleted_at = 0").bind(email, user.id).run();
@@ -324,7 +320,7 @@ async function ticketPage(env: Env, user: User | null, staff: boolean, id: numbe
     .filter((m) => staff || m.kind !== "note")
     .map((m) => {
       const name = m.kind === "requester" ? m.author || t.name || t.email : `${m.author || "Blockworked"}${m.kind === "note" ? "" : " (Blockworked)"}`;
-      const pill = m.kind === "note" ? ` <span class="mark">internal note</span>` : m.kind === "staff" && staff ? ` <span class="mark">staff</span>` : "";
+      const pill = m.kind === "note" ? ` <span class="mark">${tt('internal note')}</span>` : m.kind === "staff" && staff ? ` <span class="mark">${tt('staff')}</span>` : "";
       const avatar = m.avatar
         ? `<img class="avatar" src="${esc(m.avatar)}" alt="">`
         : `<span class="avatar blank" aria-hidden="true">${esc((name || "?").slice(0, 1).toUpperCase())}</span>`;
@@ -340,27 +336,27 @@ async function ticketPage(env: Env, user: User | null, staff: boolean, id: numbe
   const keyField = key ? `<input type="hidden" name="k" value="${esc(key)}">` : "";
   const replyForm = `<form class="comment-form" enctype="multipart/form-data" method="post" action="${action}" id="reply">${keyField}
       ${error ? `<p class="risky">${esc(error)}</p>` : ""}
-      <label class="sr" for="body">Reply</label>
-      <textarea id="body" name="body" rows="6" required maxlength="${MAX_BODY}" placeholder="${staff ? `${t.email ? `Your answer is emailed to ${esc(t.email)}` : "Your answer appears in the requester’s My tickets"}` : "Add a reply"}">${esc(draft)}</textarea>
+      <label class="sr" for="body">${tt('Reply')}</label>
+      <textarea id="body" name="body" rows="6" required maxlength="${MAX_BODY}" placeholder="${staff ? `${t.email ? `Your answer is emailed to ${esc(t.email)}` : "Your answer appears in the requester’s My tickets"}` : tp("Add a reply")}">${esc(draft)}</textarea>
       ${imageField}
-      <p class="form-foot"><span class="muted">${staff ? "Plain text. A note stays here and isn't emailed." : t.status === "closed" ? "Replying opens the ticket again." : "Plain text. Links work."}</span>
-      <span>${staff ? `<button name="kind" value="note">Add note</button> ` : ""}<button class="primary" name="kind" value="${staff ? "staff" : "requester"}">${staff ? "Send answer" : "Send reply"}</button></span></p>
+      <p class="form-foot"><span class="muted">${staff ? tp("Plain text. A note stays here and isn't emailed.") : t.status === "closed" ? tp("Replying opens the ticket again.") : tp("Plain text. Links work.")}</span>
+      <span>${staff ? `<button name="kind" value="note">${tt('Add note')}</button> ` : ""}<button class="primary" name="kind" value="${staff ? "staff" : "requester"}">${staff ? "Send answer" : tp("Send reply")}</button></span></p>
     </form>`;
   const staffBits = staff
-    ? `<p class="muted meta"><span>From ${esc(t.name ? `${t.name} <${t.email}>` : t.email)}</span>${t.user_id ? `<span>account ${esc(t.user_id)}</span>` : "<span>by email</span>"}<span>opened ${esc(when(t.created_at))}</span></p>
+    ? `<p class="muted meta"><span>From ${esc(t.name ? `${t.name} <${t.email}>` : t.email)}</span>${t.user_id ? `<span>account ${esc(t.user_id)}</span>` : `<span>${tt('by email')}</span>`}<span>opened ${esc(when(t.created_at))}</span></p>
        <form class="ticket-actions" method="post" action="${link(env, `/tickets/${t.id}/status`)}">
-         ${t.status === "closed" ? `<button name="status" value="open">Reopen</button>` : `<button name="status" value="closed">Close</button>`}
-         ${t.status === "open" ? `<button class="ghost" name="status" value="answered">Mark answered</button>` : ""}
+         ${t.status === "closed" ? `<button name="status" value="open">${tt('Reopen')}</button>` : `<button name="status" value="closed">${tt('Close')}</button>`}
+         ${t.status === "open" ? `<button class="ghost" name="status" value="answered">${tt('Mark answered')}</button>` : ""}
        </form>`
     : `<p class="muted meta"><span>Opened ${esc(when(t.created_at))}</span></p>`;
-  const crumbs = staff ? `<p class="crumbs"><a href="${link(env, "/queue")}">Queue</a></p>` : user ? `<p class="crumbs"><a href="${link(env, "/")}">My tickets</a></p>` : "";
+  const crumbs = staff ? `<p class="crumbs"><a href="${link(env, "/queue")}">${tt('Queue')}</a></p>` : user ? `<p class="crumbs"><a href="${link(env, "/")}">${tt('My tickets')}</a></p>` : "";
   return page(
     `#${t.id} ${t.subject}`,
     user,
     staff,
     `${crumbs}<h1>${esc(t.subject)} <span class="version">#${t.id}</span></h1>
      <p>${statusMark(t.status, staff)}</p>${staffBits}
-     <ol class="thread comment-list">${items}</ol>${t.account_deleted ? '<p class="muted">This account was deleted. The ticket is read-only.</p>' : replyForm}`,
+     <ol class="thread comment-list">${items}</ol>${t.account_deleted ? `<p class="muted">${tt('This account was deleted. The ticket is read-only.')}</p>` : replyForm}`,
     error ? 400 : 200,
     shell(env, user, staff),
   );
@@ -371,11 +367,11 @@ async function reply(req: Request, env: Env, user: User | null, staff: boolean, 
   const key = String(form.get("k") ?? "") || null;
   const t = await loadTicket(env, id);
   if (!t || !(await canRead(env, user, staff, t, key))) return notFound(env, user, staff);
-  if (t.account_deleted) return new Response("This account was deleted. The ticket is read-only.",{status:409});
+  if (t.account_deleted) return new Response(tp("This account was deleted. The ticket is read-only."),{status:409});
   const body = tidy(String(form.get("body") ?? ""));
   const asked = String(form.get("kind") ?? "");
   const kind = staff ? (asked === "note" ? "note" : "staff") : "requester";
-  if (!body) return ticketPage(env, user, staff, id, key, "Write something first.", "");
+  if (!body) return ticketPage(env, user, staff, id, key, tp("Write something first."), "");
   let images: ImageAttachment[];
   try { images = await formImages(form); } catch (error) { return ticketPage(env, user, staff, id, key, (error as Error).message, body); }
   await addMessage(env, t, kind, staff || t.user_id === user?.id ? (user?.id ?? null) : null, body, null, images);
@@ -418,7 +414,7 @@ export async function addMessage(env: Env, t: Ticket, kind: "requester" | "staff
 
 async function setStatus(req: Request, env: Env, id: number): Promise<Response> {
   const status = String((await req.formData()).get("status") ?? "");
-  if (status !== "open" && status !== "answered" && status !== "closed") return new Response("Bad request", { status: 400 });
+  if (status !== "open" && status !== "answered" && status !== "closed") return new Response(tp("Bad request"), { status: 400 });
   await env.DB.prepare("UPDATE tickets SET status = ?, updated_at = ? WHERE id = ?").bind(status, Date.now(), id).run();
   return redirect(link(env, `/tickets/${id}`));
 }
@@ -437,6 +433,6 @@ async function queue(env: Env, user: User, wanted: string | null): Promise<Respo
     .join("");
   const list = results.length
     ? `<ul class="ticket-list">${results.map((t) => ticketRow(env, t, true)).join("")}</ul>`
-    : `<p class="muted">${status === "open" ? "Nothing waiting. Nice." : "None."}</p>`;
-  return page("Queue", user, true, `<h1>Support queue</h1><nav class="tabs" aria-label="Status">${tabs}</nav>${list}`, 200, shell(env, user, true));
+    : `<p class="muted">${status === "open" ? tp("Nothing waiting. Nice.") : tp("None.")}</p>`;
+  return page(tp("Queue"), user, true, `<h1>${tt('Support queue')}</h1><nav class="tabs" aria-label="${tt('Status')}">${tabs}</nav>${list}`, 200, shell(env, user, true));
 }
