@@ -25,10 +25,10 @@ if deps.is_file():
         if message.get('reason') != 'compiler-artifact':
             continue
         for name in message.get('filenames', []):
-            if name.endswith(('.rlib', '.rmeta')):
-                search.add(str(Path(name).parent))
-                if message['target']['name'] == 'blockwork_core' and name.endswith('.rlib'):
-                    libraries.append(Path(name))
+            # Proc macros (.so) are dependencies too.
+            search.add(str(Path(name).parent))
+            if message['target']['name'] == 'blockwork_core' and name.endswith('.rlib'):
+                libraries.append(Path(name))
 else:
     libraries, search = list(deps.glob('libblockwork_core-*.rlib')), {str(deps)}
 if not libraries:
