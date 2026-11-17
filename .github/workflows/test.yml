@@ -45,5 +45,5 @@ jobs:
       - run: npm test
       - name: Build Blockwork's runner
         working-directory: ../Blockwork
-        run: cargo build -p blockwork-core --no-default-features
-      - run: npm run test:runtime -- ../Blockwork/target/debug/deps
+        run: cargo build -p blockwork-core --no-default-features --message-format=json-render-diagnostics > build.json
+      - run: npm run test:runtime -- ../Blockwork/build.json
