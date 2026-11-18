@@ -218,3 +218,23 @@ test("the admin pages draw, and their bulk actions log what they did", async () 
   const log = await html(logPage(env, admin));
   for (const action of ["remove-comments", "settings", "block"]) assert.match(log, new RegExp(action));
 });
+
+test("Blockwork can report a comment or a pack through the app API", async () => {
+  const { env, sql, account, from } = setup();
+  const { api } = await import("../src/api.ts");
+  const { hash } = await import("../src/auth.ts");
+  const writer = account("writer:1", 30);
+  const reporter = account("reporter:1", 30);
+  const token = "a".repeat(40);
+  sql.prepare("INSERT INTO sessions (token_hash, user_id, expires_at, kind) VALUES (?, ?, ?, 'app')").run(await hash(token), reporter.id, Date.now() + DAY);
+  const posted = await addComment(env, from("5.5.5.5"), writer, false, "Pack", "Buy followers");
+  assert.ok("id" in posted);
+  const call = (path: string, body: unknown) =>
+    api(new Request(`https://community.example.com${path}`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "CF-Connecting-IP": "6.6.6.6" }, body: JSON.stringify(body) }), env, path);
+  assert.equal((await call(`/api/v1/comments/${posted.id}/report`, { reason: "spam" })).status, 200);
+  assert.equal((await call("/api/v1/packs/Pack/report", { reason: "Harmful or malicious" })).status, 200);
+  assert.equal((await call("/api/v1/packs/Missing/report", { reason: "Spam" })).status, 404);
+  assert.deepEqual(sql.prepare("SELECT kind, item_id, reason FROM reports ORDER BY id").all().map((r) => `${r.kind} ${r.item_id} ${r.reason}`), [`comment ${posted.id} spam`, "pack Pack Harmful or malicious"]);
+  const anon = await api(new Request("https://community.example.com/api/v1/packs/Pack/report", { method: "POST", body: "{}" }), env, "/api/v1/packs/Pack/report");
+  assert.equal(anon.status, 401);
+});

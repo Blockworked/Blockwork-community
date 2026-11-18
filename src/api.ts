@@ -9,7 +9,7 @@ import type { Env } from "./index.ts";
 import { esc, page } from "./pages.ts";
 import { OFFICIAL_OWNER, readPack, sha256Hex, stampPack, type PackMeta } from "./packs.ts";
 import { listedPack, withBlockViews } from "./browse.ts";
-import { screen } from "./moderation.ts";
+import { report, screen } from "./moderation.ts";
 import { addComment, canDelete, listComments, removeComment } from "./comments.ts";
 
 const APP_SESSION_DAYS = 365;
@@ -237,6 +237,7 @@ function commentJson(c: Awaited<ReturnType<typeof listComments>>[number], user: 
     pack_author: c.user_id === ownerId,
     mine: !!user && user.id === c.user_id,
     can_delete: canDelete(user, admin, ownerId, c),
+    can_report: !!user && !user.banned && user.id !== c.user_id,
     body: c.body,
     created: c.created_at,
     // Only the writer gets their held comment back; Blockwork can mark it.
@@ -276,6 +277,7 @@ async function packDetail(env: Env, user: User | null, admin: boolean, id: strin
     })),
     comments: comments.map((c) => commentJson(c, user, admin, p.owner_id)),
     can_comment: !!user && !user.banned,
+    can_report: !!user && !user.banned && user.id !== p.owner_id,
   });
 }
 
@@ -366,6 +368,19 @@ export async function api(req: Request, env: Env, path: string): Promise<Respons
     const p = await listedPack(env, id);
     const added = (await listComments(env, id, user.id)).find((c) => c.id === result.id);
     return added && p ? json(commentJson(added, user, admin, p.owner_id)) : json({ id: result.id });
+  }
+  // POST /api/v1/comments/<id>/report and /api/v1/packs/<id>/report, body {reason}.
+  if (method === "POST" && (m = path.match(/^\/api\/v1\/(comments|packs)\/([^/]{1,400})\/report$/))) {
+    let id = "";
+    try {
+      id = decodeURIComponent(m[2]);
+    } catch {}
+    const kind = m[1] === "comments" ? "comment" : "pack";
+    if (user.banned) return fail("This account can't report things.", 403);
+    if (kind === "comment" && !/^\d{1,12}$/.test(id)) return fail("That comment doesn't exist.", 404);
+    const { reason } = await body(req);
+    const result = await report(env, req, user, kind, id, typeof reason === "string" ? reason : "");
+    return "error" in result ? fail(result.error, result.status) : json({ ok: true });
   }
   if (method === "DELETE" && (m = path.match(/^\/api\/v1\/comments\/(\d+)$/))) {
     const result = await removeComment(env, user, admin, Number(m[1]));

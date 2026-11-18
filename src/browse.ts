@@ -303,7 +303,8 @@ export async function packPage(env: Env, user: User | null, admin: boolean, id: 
      <p class="see-how"><a href="/packs/${encodeURIComponent(p.pack_id)}/source">${t('See how they work')}</a></p>
      <h2>${t('Versions')}</h2><ul class="versions">${versionList}</ul>
      ${await commentsSection(env, user, admin, p, error, draft)}
-     ${user && !user.banned && user.id !== p.owner_id ? `<details class="report"><summary class="muted">${t('Report this pack')}</summary>
+     ${!user ? `<p class="report"><a class="muted" href="/login?next=${encodeURIComponent(`/packs/${p.pack_id}`)}">${t('Sign in to report this pack')}</a></p>` : ""}
+     ${user && !user.banned && user.id !== p.owner_id ? `<details class="report"><summary>${t('Report this pack')}</summary>
        <form method="post" action="/packs/${encodeURIComponent(p.pack_id)}/report"><p><select name="reason" aria-label="${t('Reason')}">
          <option value="Spam">${t('Spam')}</option><option value="Harmful or malicious">${t('Harmful or malicious')}</option>
          <option value="Copied from someone else">${t('Copied from someone else')}</option><option value="Something else">${t('Something else')}</option></select>

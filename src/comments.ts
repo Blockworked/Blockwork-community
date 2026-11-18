@@ -77,7 +77,9 @@ export async function commentsSection(env: Env, user: User | null, admin: boolea
       const del = canDelete(user, admin, p.owner_id, c)
         ? `<form class="inline" method="post" action="/comments/${c.id}/delete"><button class="ghost small" title="${t('Delete this comment')}">${t('Delete')}</button></form>`
         : "";
-      const flag = user && user.id !== c.user_id && !user.banned
+      const flag = !user
+        ? ` <a class="muted small" href="/login?next=${encodeURIComponent(`/packs/${p.pack_id}#comment-${c.id}`)}" title="${t('Sign in to report this comment')}">${t('Report')}</a>`
+        : user.id !== c.user_id && !user.banned
         ? `<form class="inline" method="post" action="/comments/${c.id}/report"><button class="ghost small" name="reason" value="spam" title="${t('Report this comment as spam or abuse')}">${t('Report')}</button></form>`
         : "";
       // Only the writer sees a held comment (shadowbanned ones look posted).

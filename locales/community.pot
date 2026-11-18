@@ -286,6 +286,10 @@ msgid "Versions"
 msgstr ""
 
 #: src/browse.ts
+msgid "Sign in to report this pack"
+msgstr ""
+
+#: src/browse.ts
 msgid "Report this pack"
 msgstr ""
 
@@ -380,6 +384,10 @@ msgstr ""
 
 #: src/comments.ts
 msgid "Delete"
+msgstr ""
+
+#: src/comments.ts
+msgid "Sign in to report this comment"
 msgstr ""
 
 #: src/comments.ts
