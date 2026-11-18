@@ -642,7 +642,8 @@ msgid "Reply to the people who asked (optional)"
 msgstr ""
 
 #: src/language-proposals.ts
-msgid "Add to every project"
+#, python-brace-format
+msgid "Add to {project}"
 msgstr ""
 
 #: src/language-proposals.ts
@@ -678,20 +679,13 @@ msgstr ""
 msgid "Asked by a former member"
 msgstr ""
 
-#: src/language-proposals.ts src/translate.ts
-msgid "Languages"
-msgstr ""
-
-#: src/language-proposals.ts src/translate.ts
-msgid "All projects"
-msgstr ""
-
 #: src/language-proposals.ts
 msgid "Languages people asked for"
 msgstr ""
 
 #: src/language-proposals.ts
-msgid "When a few people say they’ll help, the language is added to every project and you can start translating."
+#, python-brace-format
+msgid "Requests to translate {project}. When a few people say they’ll help, the language is added and you can start translating."
 msgstr ""
 
 #: src/language-proposals.ts
@@ -706,8 +700,14 @@ msgstr ""
 msgid "Sign in with your Blockworked account to propose a language or say you’ll help."
 msgstr ""
 
+#: src/language-proposals.ts src/translate.ts
+#, python-brace-format
+msgid "Propose a language for {project}"
+msgstr ""
+
 #: src/language-proposals.ts
-msgid "Ask for a language that isn’t open yet. It’s added once a few people say they’ll help translate it."
+#, python-brace-format
+msgid "Ask for a language {project} isn’t open in yet. It’s added once a few people say they’ll help translate it."
 msgstr ""
 
 #: src/language-proposals.ts src/site-nav.ts
@@ -715,15 +715,45 @@ msgid "Language"
 msgstr ""
 
 #: src/language-proposals.ts
-msgid "For example, Brazilian Portuguese"
+msgid "Search by name, in English or in the language, or by code"
 msgstr ""
 
 #: src/language-proposals.ts
-msgid "Language code, if you know it"
+msgid "Languages"
 msgstr ""
 
 #: src/language-proposals.ts
-msgid "The ISO 639 code, with a region or script after an underscore when it matters."
+msgid "Already open"
+msgstr ""
+
+#: src/language-proposals.ts
+msgid "Already asked for"
+msgstr ""
+
+#: src/language-proposals.ts
+msgid "No language matches. You can still propose it by that name."
+msgstr ""
+
+#: src/language-proposals.ts
+#, python-brace-format
+msgid "{name} is already open for translation."
+msgstr ""
+
+#: src/language-proposals.ts
+msgid "Translate it"
+msgstr ""
+
+#: src/language-proposals.ts
+#, python-brace-format
+msgid "Someone already asked for {name}. Proposing it adds you to that request."
+msgstr ""
+
+#: src/language-proposals.ts
+msgid "Language code"
+msgstr ""
+
+#: src/language-proposals.ts
+msgid "Filled in when you pick a language from the list. Leave it empty if you’re not sure."
 msgstr ""
 
 #: src/language-proposals.ts
@@ -752,7 +782,7 @@ msgstr ""
 
 #: src/language-proposals.ts
 #, python-brace-format
-msgid "{name} is already open for translation. Pick it from a project’s language list."
+msgid "{name} is already open in {project}. Pick it from the project’s language list."
 msgstr ""
 
 #: src/language-proposals.ts
@@ -1804,6 +1834,10 @@ msgid "{done} / {total} translated"
 msgstr ""
 
 #: src/translate.ts
+msgid "All projects"
+msgstr ""
+
+#: src/translate.ts
 msgid "Needs translation"
 msgstr ""
 
@@ -1852,6 +1886,10 @@ msgid "Return to the editor and shorten your translation."
 msgstr ""
 
 #: src/translate.ts
+msgid "Browse translations"
+msgstr ""
+
+#: src/translate.ts
 msgid "Thanks. Your request is listed below, and the team has been told."
 msgstr ""
 
@@ -1869,10 +1907,6 @@ msgstr ""
 
 #: src/translate.ts
 msgid "Try again later"
-msgstr ""
-
-#: src/translate.ts
-msgid "Browse translations"
 msgstr ""
 
 #: src/translate.ts
@@ -1953,12 +1987,7 @@ msgid "Translate Blockwork and its websites into your language. Saved translatio
 msgstr ""
 
 #: src/translate.ts
-#, python-brace-format
-msgid "Don’t see your language? {link}"
-msgstr ""
-
-#: src/translate.ts
-msgid "Propose a new language"
+msgid "Don’t see your language? Open a project and propose it there."
 msgstr ""
 
 #: src/translate.ts
@@ -1983,7 +2012,11 @@ msgstr ""
 
 #: src/translate.ts
 #, python-brace-format
-msgid "Not listed? {link}"
+msgid "Not listed? {link} or {requests}."
+msgstr ""
+
+#: src/translate.ts
+msgid "see what people asked for"
 msgstr ""
 
 #: src/translate.ts

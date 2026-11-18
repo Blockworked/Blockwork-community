@@ -15,7 +15,7 @@ import { PROPOSAL_CSS, proposalAction, proposalForm, proposalsPage, proposeLangu
 const ROOT = '/translate';
 function shell(env: Env, user: User | null): Shell {
   return { name: tp('Translations'), href: translationLink(env), site: tp('Blockworked Translations'), place: {community: `${env.SITE_URL}/`, section: 'translations'},
-    nav: `<a href="${esc(translationLink(env, `${ROOT}/languages`))}">${t('Languages')}</a>` + (user ? `<a href="${esc(env.SITE_URL)}/account">${t('Account settings')}</a><span class="who">${esc(user.name)}</span>` : `<a href="${esc(translationLogin(env))}">${t('Sign in with Blockworked')}</a>`) };
+    nav: (user ? `<a href="${esc(env.SITE_URL)}/account">${t('Account settings')}</a><span class="who">${esc(user.name)}</span>` : `<a href="${esc(translationLogin(env))}">${t('Sign in with Blockworked')}</a>`) };
 }
 function render(env: Env, user: User | null, title: string, body: string, status = 200): Response {
   const response = page(title, user, isAdmin(env, user), `<style>${TRANSLATE_CSS}${PROPOSAL_CSS}</style><div class="translations">${body}</div><script src="/translate.js" defer></script>`, status, shell(env,user));
@@ -116,11 +116,16 @@ export async function translateRoute(req: Request, env: Env, user: User | null):
     try { return await screenshotFile(env, Number(shot[1])); }
     catch (error) { if (error instanceof WeblateError) return new Response('Not found', {status: error.status === 404 ? 404 : 503}); throw error; }
   }
-  if (path === `${ROOT}/languages`) {
+  // Requests used to be one list for every project; send old links to the projects.
+  if (/^\/translate\/languages(?:\/(?:new|\d+))?$/.test(path)) return redirect(translationLink(env));
+  const requests = /^\/translate\/([A-Za-z0-9_-]+\/[A-Za-z0-9_-]+)\/languages(?:\/(new|[1-9]\d{0,9}))?$/.exec(path);
+  if (requests && !available.includes(requests[1])) return render(env,user,tp('Not found'),`<h1>${t('Translation not found')}</h1><a href="${esc(translationLink(env))}">${t('Browse translations')}</a>`,404);
+  const asked = requests ? {component: requests[1], name: project(requests[1]).name} : null;
+  if (asked && !requests![2]) {
     if (req.method !== 'GET') return new Response('Method not allowed', {status:405,headers:{Allow:'GET'}});
     const done = url.searchParams.get('done');
     const notice = done === 'proposed' ? tp('Thanks. Your request is listed below, and the team has been told.') : done === 'joined' ? tp('Someone already asked for that language, so you’ve been added to it.') : done === 'added' ? tp('Language added.') : done === 'declined' ? tp('Request declined.') : '';
-    return proposalsPage(env, user, isAdmin(env, user), view, notice);
+    return proposalsPage(env, user, isAdmin(env, user), asked, view, notice);
   }
   // Every write here passes the same spam checks as the community site's.
   const refused = async (action: 'language' | 'translation') => {
@@ -130,12 +135,11 @@ export async function translateRoute(req: Request, env: Env, user: User | null):
     const error = !verdict.ok ? verdict.error : verdict.hidden ? tp("That's a lot in a short time. Try again later.") : '';
     return error ? view(tp('Try again later'), `<h1>${t('Try again later')}</h1><p>${esc(error)}</p>`, verdict.ok ? 429 : verdict.status) : null;
   };
-  if (path === `${ROOT}/languages/new`) {
-    if (req.method === 'POST') return (await refused('language')) ?? proposeLanguage(env, user!, submitted!, view);
-    return proposalForm(env, user, view);
+  if (asked && requests![2] === 'new') {
+    if (req.method === 'POST') return (await refused('language')) ?? proposeLanguage(env, user!, asked, submitted!, view);
+    return proposalForm(env, user, asked, view);
   }
-  const proposal = /^\/translate\/languages\/([1-9]\d{0,9})$/.exec(path);
-  if (proposal && req.method === 'POST') return proposalAction(env, user!, isAdmin(env, user), Number(proposal[1]), submitted!, view);
+  if (asked && req.method === 'POST') return proposalAction(env, user!, isAdmin(env, user), asked, Number(requests![2]), submitted!, view);
 
   const match = /^\/translate\/([A-Za-z0-9_-]+)\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_@.-]+)(\/strings)?)?$/.exec(path);
   const component = match ? `${match[1]}/${match[2]}` : '';
@@ -176,14 +180,14 @@ async function projects(env: Env, user: User | null, available: string[]): Promi
     return `<li><a href="${translationLink(env)}/${c}"><span class="translation-name">${esc(p.name)}</span><span class="muted">${esc(p.about)}</span><span class="translation-meta-line">${tn('{n} language', '{n} languages', s.value.length)}${total ? ` · ${t('{percent}% translated overall', {percent: Math.floor(done / total * 100)})}` : ''}</span></a></li>`;
   }).join('');
   return render(env,user,tp('Translations'),`<h1>${t('Translations')}</h1><p class="lede">${t('Translate Blockwork and its websites into your language. Saved translations are reviewed, then ship with the next release.')}</p><ul class="translation-list">${rows}</ul>
-    <p>${t('Don’t see your language? {link}', {link: raw(`<a href="${esc(translationLink(env, `${ROOT}/languages/new`))}">${t('Propose a new language')}</a>`)})}</p>
+    <p class="hint">${t('Don’t see your language? Open a project and propose it there.')}</p>
     <p class="hint">${t('Sign in with your Blockworked account to save. Translations are credited to your public name.')}</p>`);
 }
 
 function languagePicker(env: Env, user: User | null, component: string, languages: Translation[]): Response {
   const p = project(component);
   return render(env,user,p.name,`${back(env)}<h1>${esc(p.name)}</h1><p class="lede">${t('Pick a language. You’ll start with the strings it’s missing.')}</p><div class="search translation-search">${SEARCH}<input type="search" id="language-search" placeholder="${esc(tp('Find a language'))}" aria-label="${esc(tp('Find a language'))}" autocomplete="off"></div>${languages.length ? `<ul class="translation-list languages">${languages.map(tr => `<li data-language="${esc(tr.language.name + ' ' + tr.language.code)}"><a href="${translationLink(env)}/${component}/${encodeURIComponent(tr.language.code)}"><span class="translation-name">${esc(tr.language.name)} <span class="n">${esc(tr.language.code)}</span></span>${progress(tr.translated, tr.total)}</a></li>`).join('')}</ul>` : `<p class="empty">${t('No languages yet.')}</p>`}<p id="language-empty" class="empty" hidden>${t('No languages match.')}</p>
-    <p class="hint">${t('Not listed? {link}', {link: raw(`<a href="${esc(translationLink(env, `${ROOT}/languages/new`))}">${t('Propose a new language')}</a>`)})}</p>`);
+    <p class="hint">${t('Not listed? {link} or {requests}.', {link: raw(`<a href="${esc(translationLink(env, `${ROOT}/${component}/languages/new`))}">${t('Propose a language for {project}', {project: p.name})}</a>`), requests: raw(`<a href="${esc(translationLink(env, `${ROOT}/${component}/languages`))}">${t('see what people asked for')}</a>`)})}</p>`);
 }
 
 /** The tabs and search box above both the editor and the list. */

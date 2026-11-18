@@ -46,11 +46,15 @@ function setup() {
   return {...f, unit, calls, request, restore: () => { globalThis.fetch = original; f.sql.close(); }};
 }
 
-test('projects page hides a project Weblate does not have yet and links to proposals', async () => {
+test('projects page hides a project Weblate does not have yet and sends proposals to a project', async () => {
   const f = setup(); try {
     const html = await (await f.request('/translate')).text();
     assert.match(html, /Blockwork app/); assert.doesNotMatch(html, /blockworked\.com<\/span>/);
-    assert.match(html, /65% translated overall/); assert.match(html, /\/translate\/languages\/new/);
+    assert.match(html, /65% translated overall/); assert.match(html, /Open a project and propose it there/);
+    assert.doesNotMatch(html, /href="[^"]*\/translate\/languages"/);
+    const picker = await (await f.request('/translate/blockwork/ui')).text();
+    assert.match(picker, /\/translate\/blockwork\/ui\/languages\/new/);
+    assert.equal((await f.request('/translate/languages/new')).status, 303);
   } finally { f.restore(); }
 });
 
@@ -106,27 +110,40 @@ test('suggest, vote and comment post signed requests to their own endpoints', as
   } finally { f.restore(); }
 });
 
-test('a language proposal collects helpers and an admin adds it to every project', async () => {
+test('a language proposal belongs to one project, collects helpers, and an admin adds it there', async () => {
   const f = setup(); try {
-    const made = await f.request('/translate/languages/new', {name:'Brazilian Portuguese',code:'pt-br',note:'I can help'});
-    assert.equal(made.status, 303); assert.match(made.headers.get('Location')!, /done=proposed/);
-    const row = f.sql.prepare('SELECT id, code, status FROM language_proposals').get() as {id:number;code:string;status:string};
-    assert.equal(row.code, 'pt_BR');
-    const again = await f.request('/translate/languages/new', {name:'Portuguese (Brazil)',code:'pt_BR'}, admin);
+    const L = '/translate/blockwork/ui/languages';
+    const form = await (await f.request(`${L}/new`)).text();
+    assert.match(form, /Propose a language for Blockwork app/);
+    const catalog = JSON.parse(/<script type="application\/json" id="language-catalog">(.*?)<\/script>/s.exec(form)![1]);
+    assert.ok(catalog.languages.some((l: string[]) => l[0] === 'pt_BR' && l[2] === 'português (Brasil)'));
+    assert.match(catalog.open.fr, /\/translate\/blockwork\/ui\/fr$/);
+    const made = await f.request(`${L}/new`, {name:'Brazilian Portuguese',code:'pt-br',note:'I can help'});
+    assert.equal(made.status, 303); assert.match(made.headers.get('Location')!, /\/translate\/blockwork\/ui\/languages\?done=proposed/);
+    const row = f.sql.prepare('SELECT id, code, status, component FROM language_proposals').get() as {id:number;code:string;status:string;component:string};
+    assert.equal(row.code, 'pt_BR'); assert.equal(row.component, 'blockwork/ui');
+    assert.deepEqual(JSON.parse(/id="language-catalog">(.*?)<\/script>/s.exec(await (await f.request(`${L}/new`)).text())![1]).asked, ['pt_br']);
+    const again = await f.request(`${L}/new`, {name:'Portuguese (Brazil)',code:'pt_BR'}, admin);
     assert.match(again.headers.get('Location')!, /done=joined/);
-    const open = await f.request('/translate/languages/new', {name:'French',code:'fr'}, admin);
+    // The same language for another project is its own request.
+    const elsewhere = await f.request('/translate/blockworked/website/languages/new', {name:'Portuguese (Brazil)',code:'pt_BR'}, admin);
+    assert.match(elsewhere.headers.get('Location')!, /blockworked\/website\/languages\?done=proposed/);
+    const open = await f.request(`${L}/new`, {name:'French',code:'fr'}, admin);
     assert.equal(open.status, 409);
-    let list = await (await f.request('/translate/languages')).text();
-    assert.match(list, /2 people will help/); assert.match(list, /You’ll help/);
-    assert.equal((await f.request(`/translate/languages/${row.id}`, {action:'add',code:'pt_BR'})).status, 403);
-    const added = await f.request(`/translate/languages/${row.id}`, {action:'add',code:'pt_BR',reply:'Open now'}, admin);
+    let list = await (await f.request(L)).text();
+    assert.match(list, /2 people will help/); assert.match(list, /You’ll help/); assert.doesNotMatch(list, /Add to Blockwork app/);
+    assert.match(await (await f.request(L, undefined, admin)).text(), /Add to Blockwork app/);
+    assert.equal((await f.request(`${L}/${row.id}`, {action:'add',code:'pt_BR'})).status, 403);
+    assert.equal((await f.request(`/translate/blockworked/website/languages/${row.id}`, {action:'add',code:'pt_BR'}, admin)).status, 404);
+    const added = await f.request(`${L}/${row.id}`, {action:'add',code:'pt_BR',reply:'Open now'}, admin);
     assert.match(added.headers.get('Location')!, /done=added/);
     const creates = f.calls.filter(c => c.method === 'POST' && c.url.pathname.startsWith('/api/components/'));
-    assert.deepEqual(creates.map(c => c.url.pathname), ['/api/components/blockwork/ui/translations/', '/api/components/blockworked/website/translations/']);
+    assert.deepEqual(creates.map(c => c.url.pathname), ['/api/components/blockwork/ui/translations/']);
     assert.deepEqual(creates[0].body, {language_code:'pt_BR'});
-    list = await (await f.request('/translate/languages')).text();
+    list = await (await f.request(L)).text();
     assert.match(list, /Added/); assert.match(list, /Open now/);
-    assert.equal((await f.request('/translate/languages/new', {name:'x',code:'not a code'})).status, 400);
+    assert.equal((await f.request(`${L}/new`, {name:'x',code:'not a code'})).status, 400);
+    assert.equal((await f.request('/translate/nobody/here/languages/new')).status, 404);
   } finally { f.restore(); }
 });
 

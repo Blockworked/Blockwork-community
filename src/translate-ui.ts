@@ -114,6 +114,103 @@ export const TRANSLATE_JS = `
     });
     document.getElementById('language-empty').hidden = visible > 0;
   });
+  // The language picker: search Weblate's languages by any of their names or code.
+  const catalog = document.getElementById('language-catalog'), nameInput = document.getElementById('language-name');
+  if (catalog && nameInput) {
+    const data = JSON.parse(catalog.textContent), list = document.getElementById('language-options');
+    const codeInput = document.getElementById('language-code'), picked = document.getElementById('language-picked');
+    const fold = s => s.normalize('NFD').replace(/\\p{M}/gu, '').toLocaleLowerCase();
+    const ui = document.documentElement.lang || 'en';
+    let local = null;
+    try { if (!/^en\\b/.test(ui)) local = new Intl.DisplayNames([ui], {type: 'language', fallback: 'none'}); } catch {}
+    const open = new Map(Object.entries(data.open)), asked = new Set(data.asked);
+    const entries = data.languages.map(([code, english, native, aliases]) => {
+      const tag = code.replace(/@.*/, '').replace(/_/g, '-');
+      let mine = '';
+      try { mine = local ? local.of(tag) || '' : ''; } catch {}
+      if (mine === english || mine === native) mine = '';
+      const names = [english, native, mine, aliases].filter(Boolean).map(fold);
+      return {code, english, native, mine, names, codes: [code.toLowerCase(), tag.toLowerCase()], base: !/[_@]/.test(code)};
+    });
+    const words = n => n.split(/[^\\p{L}\\p{N}]+/u).filter(Boolean);
+    entries.forEach(e => { e.words = e.names.flatMap(words); });
+    // Lower is better: a code, a whole name, a name's start, every word's start, then anywhere.
+    const rank = (e, q, parts) => {
+      if (e.codes.includes(q.replace(/\\s+/g, ''))) return 0;
+      if (e.names.includes(q)) return 1;
+      if (e.names.some(n => n.startsWith(q))) return 2;
+      if (parts.length && parts.every(w => e.words.some(x => x.startsWith(w)))) return 3;
+      if (e.codes.some(c => c.startsWith(q))) return 4;
+      if (q.length > 2 && e.names.some(n => n.includes(q))) return 5;
+      return 9;
+    };
+    let shown = [], active = -1, chosen = null;
+    const close = () => { list.hidden = true; nameInput.setAttribute('aria-expanded', 'false'); nameInput.removeAttribute('aria-activedescendant'); active = -1; };
+    const mark = i => {
+      active = i;
+      list.querySelectorAll('[role=option]').forEach((li, j) => li.setAttribute('aria-selected', String(j === i)));
+      const li = list.querySelector('#language-option-' + i);
+      if (li) { nameInput.setAttribute('aria-activedescendant', li.id); li.scrollIntoView({block: 'nearest'}); } else nameInput.removeAttribute('aria-activedescendant');
+    };
+    const status = code => open.has(code.toLowerCase()) ? 'open' : asked.has(code.toLowerCase()) ? 'asked' : '';
+    const show = () => {
+      const q = fold(nameInput.value.trim());
+      if (!q) { close(); return; }
+      const parts = words(q);
+      shown = entries.map(e => [rank(e, q, parts), e]).filter(([r]) => r < 9)
+        // Widely used languages have names of their own in the browser's data; they come first.
+        .sort((a, b) => a[0] - b[0] || !!b[1].native - !!a[1].native || b[1].base - a[1].base || a[1].english.length - b[1].english.length || a[1].english.localeCompare(b[1].english))
+        .slice(0, 30).map(([, e]) => e);
+      list.replaceChildren(...(shown.length ? shown.map((e, i) => {
+        const li = document.createElement('li'), label = document.createElement('span'), code = document.createElement('span');
+        li.id = 'language-option-' + i; li.setAttribute('role', 'option'); li.setAttribute('aria-selected', 'false');
+        label.className = 'language-label'; label.textContent = e.mine || e.english;
+        const other = [e.mine ? e.english : '', e.native].filter(Boolean).join(' · ');
+        if (other) { const n = document.createElement('span'); n.className = 'language-native'; n.textContent = other; if (e.native) n.lang = e.code.replace(/@.*/, '').replace(/_/g, '-'); label.append(n); }
+        code.className = 'language-code'; code.textContent = e.code;
+        li.append(label, code);
+        const s = status(e.code);
+        if (s) { const n = document.createElement('span'); n.className = 'language-note'; n.textContent = list.dataset[s]; li.append(n); }
+        li.addEventListener('mousedown', event => { event.preventDefault(); pick(e); });
+        return li;
+      }) : [Object.assign(document.createElement('li'), {className: 'language-none', textContent: list.dataset.none})]));
+      list.hidden = false; nameInput.setAttribute('aria-expanded', 'true');
+      mark(shown.length ? 0 : -1);
+    };
+    const explain = e => {
+      const s = e ? status(e.code) : '';
+      picked.hidden = !s; picked.replaceChildren();
+      if (!s) return;
+      picked.append(picked.dataset[s].replace('{name}', e.english));
+      if (s === 'open') { const a = document.createElement('a'); a.href = open.get(e.code.toLowerCase()); a.textContent = picked.dataset.translate; picked.append(' ', a); }
+    };
+    const pick = e => {
+      chosen = e; nameInput.value = e.english; codeInput.value = e.code;
+      close(); explain(e);
+    };
+    nameInput.addEventListener('input', () => {
+      // Typing over a picked language forgets its code.
+      if (chosen && codeInput.value === chosen.code) codeInput.value = '';
+      chosen = null; explain(null); show();
+    });
+    nameInput.addEventListener('focus', () => { if (!chosen && nameInput.value.trim()) show(); });
+    nameInput.addEventListener('blur', close);
+    nameInput.addEventListener('keydown', event => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (list.hidden) { show(); return; }
+        if (shown.length) mark((active + (event.key === 'ArrowDown' ? 1 : -1) + shown.length) % shown.length);
+      } else if (event.key === 'Enter' && !list.hidden && active >= 0) { event.preventDefault(); pick(shown[active]); }
+      else if (event.key === 'Escape' && !list.hidden) { event.preventDefault(); close(); }
+    });
+    // A code typed by hand picks its language too.
+    codeInput.addEventListener('change', () => {
+      const q = codeInput.value.trim().toLowerCase().replace(/-/g, '_'), e = entries.find(x => x.code.toLowerCase() === q);
+      if (e) { codeInput.value = e.code; if (!nameInput.value.trim()) nameInput.value = e.english; chosen = e; }
+      explain(e);
+    });
+    if (codeInput.value) codeInput.dispatchEvent(new Event('change'));
+  }
   const form = document.getElementById('translation-form');
   if (!form) return;
   let dirty = form.dataset.draft === 'true';
