@@ -131,6 +131,7 @@ button.large, .button.large { min-height: 44px; padding: 0 20px; font-size: 15px
 .signin .button { min-width: 240px; }
 form.inline { display: inline; }
 input[type=text], input[type=email], input[type=password], input[type=file] { font: inherit; font-size: 13px; padding: 7px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg2); color: var(--fg); width: min(100%, 420px); transition: box-shadow 120ms var(--ease), border-color 120ms var(--ease); }
+.cf-turnstile { width: min(100%, 420px); margin: 8px 0; }
 input[type=text]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.28); }
 input[type=file]::file-selector-button { font: inherit; margin-right: 10px; padding: 5px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg3); color: var(--fg); cursor: pointer; }
 
