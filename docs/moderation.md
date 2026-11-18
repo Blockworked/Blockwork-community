@@ -19,6 +19,7 @@ requests and translation saves. Moderation pages are under `/admin/moderation`
 - **Turnstile** (Cloudflare's CAPTCHA) on email sign-up, password reset, new
   tickets, web uploads and new accounts' comments. Off until both
   `TURNSTILE_SITE_KEY` (a var) and `TURNSTILE_SECRET` (a secret) are set.
+  Once they are, admins can switch it off and on under Emergency switches.
 - **Reports.** Signed-in people can report a comment or pack. Three reports
   hold a comment.
 - **Emergency switches** on `/admin/moderation`: pause posting for new

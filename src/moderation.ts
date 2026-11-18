@@ -153,22 +153,28 @@ export function hasLinks(text: string): boolean {
 
 // Turnstile
 
-export function turnstileOn(env: Env): boolean {
+/** Whether the keys are there. The CSP allows the widget whenever they are. */
+export function turnstileConfigured(env: Env): boolean {
   return !!env.TURNSTILE_SITE_KEY && !!env.TURNSTILE_SECRET;
+}
+
+/** Whether forms ask for Turnstile: set up, and not switched off by an admin. */
+export async function turnstileOn(env: Env): Promise<boolean> {
+  return turnstileConfigured(env) && (await setting(env, "turnstile", "on")) !== "off";
 }
 
 export const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
 
 /** The challenge widget for a form, or nothing when Turnstile isn't set up. */
-export function turnstileWidget(env: Env): string {
-  if (!turnstileOn(env)) return "";
+export async function turnstileWidget(env: Env): Promise<string> {
+  if (!(await turnstileOn(env))) return "";
   const key = env.TURNSTILE_SITE_KEY!.replace(/[^A-Za-z0-9_-]/g, "");
   return `<div class="cf-turnstile" data-sitekey="${key}" data-theme="auto" data-size="flexible"></div><script src="${TURNSTILE_ORIGIN}/turnstile/v0/api.js" async defer></script>`;
 }
 
-/** Checks the token a form sent. Passes when Turnstile isn't set up. */
+/** Checks the token a form sent. Passes when Turnstile isn't set up or is switched off. */
 export async function passedTurnstile(env: Env, req: Request | null, token: unknown): Promise<boolean> {
-  if (!turnstileOn(env)) return true;
+  if (!(await turnstileOn(env))) return true;
   if (typeof token !== "string" || !token || token.length > 2048) return false;
   const body = new URLSearchParams({ secret: env.TURNSTILE_SECRET!, response: token });
   const ip = clientIp(req);

@@ -16,7 +16,7 @@ import {
   rollbackAccount,
   sameNetwork,
   setting,
-  turnstileOn,
+  turnstileConfigured,
   undo,
   type BanMode,
   type Change,
@@ -98,7 +98,7 @@ const COMMENT_SELECT = `SELECT c.id, c.pack_id, c.user_id, c.body, c.created_at,
 
 export async function moderationPage(env: Env, user: User, notice = ""): Promise<Response> {
   const now = Date.now();
-  const [held, reported, recent, accounts, stats, reports, blocks, mode, signups] = await Promise.all([
+  const [held, reported, recent, accounts, stats, reports, blocks, mode, signups, turnstileSetting] = await Promise.all([
     env.DB.prepare(`${COMMENT_SELECT} WHERE c.held = 1 AND c.removed_at IS NULL AND c.deleted_at IS NULL ORDER BY c.created_at LIMIT 200`).all<Activity>(),
     env.DB.prepare(
       `${COMMENT_SELECT.replace("SELECT c.id", "SELECT (SELECT COUNT(*) FROM reports r WHERE r.kind = 'comment' AND r.item_id = CAST(c.id AS TEXT) AND r.resolved_at IS NULL) AS reports, c.id")}
@@ -135,14 +135,17 @@ export async function moderationPage(env: Env, user: User, notice = ""): Promise
     }>(),
     lockdown(env),
     setting(env, "signups", "open"),
+    setting(env, "turnstile", "on"),
   ]);
   const s = stats!;
+  const turnstile = turnstileConfigured(env) && turnstileSetting !== "off";
   const lockForm = `<form method="post" action="/admin/moderation/settings" class="mod-actions">
     <label>Posting <select name="lockdown">
       <option value="off"${mode === "off" ? " selected" : ""}>open to everyone</option>
       <option value="new"${mode === "new" ? " selected" : ""}>paused for new accounts</option>
       <option value="all"${mode === "all" ? " selected" : ""}>paused for everyone but admins</option></select></label>
     <label>Sign-ups <select name="signups"><option value="open"${signups !== "closed" ? " selected" : ""}>open</option><option value="closed"${signups === "closed" ? " selected" : ""}>closed</option></select></label>
+    <label>Turnstile <select name="turnstile"${turnstileConfigured(env) ? "" : " disabled"}><option value="on"${turnstileSetting !== "off" ? " selected" : ""}>on</option><option value="off"${turnstileSetting === "off" ? " selected" : ""}>off</option></select></label>
     <button class="primary">Save</button></form>`;
   const accountRows = accounts.results.length
     ? `<table class="mod"><thead><tr><th></th><th>Account</th><th>Joined</th><th>Comments</th><th>Uploads</th><th>Tickets</th></tr></thead><tbody>${accounts.results
@@ -182,7 +185,7 @@ export async function moderationPage(env: Env, user: User, notice = ""): Promise
        <div class="mod-stat"><strong>${s.comments}</strong> comments in the last hour<br><span class="muted">${s.fresh} from new accounts (holds at ${FLOOD_PER_HOUR})</span></div>
        <div class="mod-stat"><strong>${s.signups}</strong> new accounts in the last hour</div>
        <div class="mod-stat"><strong>${s.uploads}</strong> uploads, <strong style="display:inline">${s.tickets}</strong> tickets in the last hour</div>
-       <div class="mod-stat"><strong>${turnstileOn(env) ? "On" : "Off"}</strong> Turnstile<br><span class="muted">${turnstileOn(env) ? "on sign-up, tickets, uploads and new accounts' comments" : "set TURNSTILE_SITE_KEY and TURNSTILE_SECRET"}</span></div>
+       <div class="mod-stat"><strong>${turnstile ? "On" : "Off"}</strong> Turnstile<br><span class="muted">${turnstile ? "on sign-up, tickets, uploads and new accounts' comments" : turnstileConfigured(env) ? "switched off below" : "set TURNSTILE_SITE_KEY and TURNSTILE_SECRET"}</span></div>
      </div>
      <h2>Emergency switches</h2><p class="muted">Pause posting while you clean up a flood. Admins can always post.</p>${lockForm}
      <h2 id="held">Held comments</h2><p class="muted">New accounts' comments with links, every new account's during a flood, and comments reported by ${3} people wait here. Only their writers see them.</p>
@@ -285,19 +288,22 @@ export async function settingsAction(req: Request, env: Env, actor: User): Promi
   const form = await req.formData();
   const mode = String(form.get("lockdown") ?? "off");
   const signups = String(form.get("signups") ?? "open");
-  if (!["off", "new", "all"].includes(mode) || !["open", "closed"].includes(signups)) return new Response("Bad request", { status: 400 });
+  // A disabled select sends nothing, so keep what's saved.
+  const turnstile = String(form.get("turnstile") ?? (await setting(env, "turnstile", "on")));
+  if (!["off", "new", "all"].includes(mode) || !["open", "closed"].includes(signups) || !["on", "off"].includes(turnstile)) return new Response("Bad request", { status: 400 });
   const now = Date.now();
   await env.DB.batch(
     [
       ["lockdown", mode],
       ["signups", signups],
+      ["turnstile", turnstile],
     ].map(([k, v]) =>
       env.DB.prepare(
         "INSERT INTO moderation_settings (key, value, updated_by, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at",
       ).bind(k, v, actor.id, now),
     ),
   );
-  await note(env, actor.id, "settings", { kind: "site", id: "settings" }, `posting ${mode}; sign-ups ${signups}`);
+  await note(env, actor.id, "settings", { kind: "site", id: "settings" }, `posting ${mode}; sign-ups ${signups}; Turnstile ${turnstile}`);
   return redirect("/admin/moderation");
 }
 

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { fixture } from "./helpers/accounts.ts";
 import type { User } from "../src/auth.ts";
 import { addComment, listComments } from "../src/comments.ts";
-import { passedTurnstile, report, rollbackAccount, sameNetwork, screen, undo } from "../src/moderation.ts";
+import { passedTurnstile, report, turnstileWidget, rollbackAccount, sameNetwork, screen, undo } from "../src/moderation.ts";
 import { receiveEmail, senderCheck } from "../src/support-inbound.ts";
 
 const DAY = 86400_000;
@@ -137,6 +137,30 @@ test("Turnstile is checked when it's set up, and skipped when it isn't", async (
   globalThis.fetch = (async (_: unknown, init?: RequestInit) => Response.json({ success: String(init?.body).includes("response=good") })) as typeof fetch;
   assert.equal(await passedTurnstile(env, null, "good"), true);
   assert.equal(await passedTurnstile(env, null, "bad"), false);
+});
+
+test("an admin can switch Turnstile off and on again", async () => {
+  const { env, sql, account } = setup();
+  env.TURNSTILE_SITE_KEY = "site";
+  env.TURNSTILE_SECRET = "secret";
+  const admin = account("admin:1", 100);
+  const { moderationPage, settingsAction } = await import("../src/moderation-admin.ts");
+  const save = (turnstile?: string) => {
+    const body = new FormData();
+    body.append("lockdown", "off");
+    body.append("signups", "open");
+    if (turnstile) body.append("turnstile", turnstile);
+    return settingsAction(new Request("https://community.example.com/admin", { method: "POST", body }), env, admin);
+  };
+  assert.match(await turnstileWidget(env), /cf-turnstile/);
+  await save("off");
+  assert.equal(await turnstileWidget(env), "");
+  assert.equal(await passedTurnstile(env, null, undefined), true);
+  assert.match(await (await moderationPage(env, admin)).text(), /<strong>Off<\/strong> Turnstile[\s\S]*switched off below/);
+  await save();
+  assert.equal(sql.prepare("SELECT value FROM moderation_settings WHERE key = 'turnstile'").get()!.value, "off");
+  await save("on");
+  assert.equal(await passedTurnstile(env, null, undefined), false);
 });
 
 test("sender checks read the receiving server's SPF, DKIM and DMARC results", () => {

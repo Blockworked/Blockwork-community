@@ -99,7 +99,7 @@ export async function commentsSection(env: Env, user: User | null, admin: boolea
       ${error ? `<p class="risky">${esc(error)}</p>` : ""}
       <label class="sr" for="comment">${t('Comment')}</label>
       <textarea id="comment" name="body" rows="4" maxlength="${MAX_COMMENT}" required placeholder="${t('Ask a question, share how you use it, or report a problem')}">${esc(draft)}</textarea>
-      ${await isNewAccount(env, user) ? turnstileWidget(env) : ""}
+      ${await isNewAccount(env, user) ? await turnstileWidget(env) : ""}
       <p class="form-foot"><span class="muted">${t('Plain text. Links work. Be kind.')}</span><button class="primary">${t('Post comment')}</button></p></form>`;
   }
   return `<section class="comments" id="comments"><h2>${shown === 1 ? "1 comment" : `${shown} comments`}</h2>

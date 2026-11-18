@@ -24,7 +24,7 @@ import { supportPath, supportRoute, supportUrl } from "./support.ts";
 import { receiveEmail } from "./support-inbound.ts";
 import { bulkVersions, reviewDecision, reviewFile, reviewPage, reviewQueue, setListed } from "./admin.ts";
 import { blocklistAction, bulkAccounts, bulkComments, logPage, moderationPage, reportAction, settingsAction, undoAction, userAction, userPage } from "./moderation-admin.ts";
-import { passedTurnstile, report, TURNSTILE_FAILED, TURNSTILE_ORIGIN, turnstileOn, turnstileWidget } from "./moderation.ts";
+import { passedTurnstile, report, TURNSTILE_FAILED, TURNSTILE_ORIGIN, turnstileConfigured, turnstileWidget } from "./moderation.ts";
 
 export interface Env {
   DB: D1Database;
@@ -87,7 +87,7 @@ function securityHeaders(env: Env, loopbackForm = false): Record<string, string>
   // The app sign-in page's form answers Blockwork on this computer.
   const formAction = loopbackForm ? "'self' http://127.0.0.1:*" : "'self'";
   // Turnstile's widget is a script and a frame from Cloudflare.
-  const challenge = turnstileOn(env) ? ` ${TURNSTILE_ORIGIN}` : "";
+  const challenge = turnstileConfigured(env) ? ` ${TURNSTILE_ORIGIN}` : "";
   return {
     "Content-Security-Policy":
       `default-src 'none'; script-src 'self'${challenge}; style-src 'unsafe-inline'; img-src 'self' https:; font-src 'self'; connect-src 'self'; frame-src ${viewer}${challenge}; form-action ${formAction}; frame-ancestors 'none'; base-uri 'none'`,
@@ -334,7 +334,7 @@ function png(base64: string): Response {
   return new Response(bytes, { headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" } });
 }
 
-function submitForm(env: Env, user: User, admin: boolean, error = ""): Response {
+async function submitForm(env: Env, user: User, admin: boolean, error = ""): Promise<Response> {
   return page(tp("Submit a pack"),
     user,
     admin,
@@ -348,7 +348,7 @@ function submitForm(env: Env, user: User, admin: boolean, error = ""): Response 
      Packs shouldn't run commands, go online, write files or read secrets unless that's plainly their purpose.</p>
      <form method="post" enctype="multipart/form-data">
        <p><input type="file" name="pack" accept=".blockpack,.json,application/json" required></p>
-       ${admin ? "" : turnstileWidget(env)}
+       ${admin ? "" : await turnstileWidget(env)}
        <p><button class="primary">Submit for review</button></p>
      </form>`,
     error ? 400 : 200,

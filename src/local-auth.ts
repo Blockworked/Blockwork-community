@@ -95,8 +95,8 @@ export async function localAuth(req: Request, env: Env, ctx?: Pick<ExecutionCont
       if (!user) return redirect('/login?next=%2Faccount%2Fsecurity');
       return await securityProof(req, env, user) ? settings(req, env, user) : redirect('/account/unlock');
     }
-    if (path === '/auth/email/signup') return screen(user, env, tp('Create an account'), `<form method="post">${input('name', tp('Display name'), 'text', 'nickname')}${input('email', 'Email', 'email')}${turnstileWidget(env)}<button class="primary">${t('Verify email')}</button></form><p>${t('You will set a password after verifying your email.')}</p>`);
-    if (path === '/auth/email/forgot') return screen(user, env, tp('Reset password'), `<form method="post">${input('email', 'Email', 'email')}${turnstileWidget(env)}<button>${t('Send reset link')}</button></form><p>${t('Resetting your password signs out all browsers and apps. Your passkeys, authenticator app and backup codes stay in place.')}</p>`);
+    if (path === '/auth/email/signup') return screen(user, env, tp('Create an account'), `<form method="post">${input('name', tp('Display name'), 'text', 'nickname')}${input('email', 'Email', 'email')}${await turnstileWidget(env)}<button class="primary">${t('Verify email')}</button></form><p>${t('You will set a password after verifying your email.')}</p>`);
+    if (path === '/auth/email/forgot') return screen(user, env, tp('Reset password'), `<form method="post">${input('email', 'Email', 'email')}${await turnstileWidget(env)}<button>${t('Send reset link')}</button></form><p>${t('Resetting your password signs out all browsers and apps. Your passkeys, authenticator app and backup codes stay in place.')}</p>`);
     if (path === '/auth/email/verify' || path === '/auth/email/reset') {
       const purpose = path.endsWith('reset') ? 'reset' : 'verify';
       const token = url.searchParams.get('token') ?? '';

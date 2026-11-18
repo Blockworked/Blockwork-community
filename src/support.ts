@@ -219,7 +219,7 @@ async function newForm(env: Env, user: User, staff: boolean, error = "", draft: 
        <label class="field" for="body">${tt('What\'s going on?')}</label>
        <textarea id="body" name="body" required maxlength="${MAX_BODY}" placeholder="${tt('What you were doing, what happened, and your Blockwork version if it\'s about the app')}">${esc(draft.body ?? "")}</textarea>
        ${imageField}
-       ${staff ? "" : turnstileWidget(env)}
+       ${staff ? "" : await turnstileWidget(env)}
        <p class="form-foot"><span class="muted">${tt('Plain text. Links work.')}</span><button class="primary">${tt('Send')}</button></p>
      </form>`,
     error ? 400 : 200,
