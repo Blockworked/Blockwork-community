@@ -284,6 +284,9 @@ export async function bulkAccounts(req: Request, env: Env, actor: User): Promise
   return moderationPage(env, actor, await rollbackMany(env, actor, ids, since(form), banMode(form), form.get("network") === "1"));
 }
 
+/** How the log words each posting mode, matching the switch's own labels. */
+const POSTING: Record<string, string> = { off: "open to everyone", new: "paused for new accounts", all: "paused for everyone but admins" };
+
 export async function settingsAction(req: Request, env: Env, actor: User): Promise<Response> {
   const form = await req.formData();
   const mode = String(form.get("lockdown") ?? "off");
@@ -303,7 +306,7 @@ export async function settingsAction(req: Request, env: Env, actor: User): Promi
       ).bind(k, v, actor.id, now),
     ),
   );
-  await note(env, actor.id, "settings", { kind: "site", id: "settings" }, `posting ${mode}; sign-ups ${signups}; Turnstile ${turnstile}`);
+  await note(env, actor.id, "settings", { kind: "site", id: "settings" }, `posting ${POSTING[mode]}; sign-ups ${signups}; Turnstile ${turnstile}`);
   return redirect("/admin/moderation");
 }
 

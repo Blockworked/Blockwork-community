@@ -217,6 +217,7 @@ test("the admin pages draw, and their bulk actions log what they did", async () 
   assert.equal(sql.prepare("SELECT value FROM blocklist").get()!.value, "spam.example");
   const log = await html(logPage(env, admin));
   for (const action of ["remove-comments", "settings", "block"]) assert.match(log, new RegExp(action));
+  assert.match(log, /posting paused for new accounts; sign-ups closed/);
 });
 
 test("Blockwork can report a comment or a pack through the app API", async () => {
