@@ -43,7 +43,7 @@ SUPPORT_STAFF = ""
 # Sign-in cookies cover support.blockworked.com too.
 COOKIE_DOMAIN = "blockworked.com"
 # Cloudflare Turnstile's public site key; with the TURNSTILE_SECRET secret it turns the check on (docs/moderation.md).
-# TURNSTILE_SITE_KEY = ""
+TURNSTILE_SITE_KEY = "0x4AAAAAAGGtFlAfqmSw4b2L"
 
 [[d1_databases]]
 binding = "DB"
