@@ -147,7 +147,6 @@ img.avatar { width: 22px; height: 22px; border-radius: 50%; }
   .site-header .container, .site-footer .container { padding: 0 16px; }
   .who { display: none; }
   .subbar nav a { padding: 6px 8px; }
-  .site-footer .copyright { margin-left: 0; }
 }
 ${BROWSE_CSS}
 ${SUPPORT_CSS}

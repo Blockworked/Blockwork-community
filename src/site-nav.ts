@@ -86,14 +86,18 @@ export function agreement(): string {
 
 export function siteFooter(place = LIBRARY): string {
   const year = new Date().getFullYear();
+  const links = navLinks(place)
+    .map((link) => `<a href="${esc(link.href)}">${link.label}</a>`)
+    .join("");
   return `<footer class="site-footer"><div class="container site-footer-inner">
+<div class="footer-primary">
 <a class="footer-brand" href="${esc(mainUrl)}/"><img src="/logo.png" alt="" width="22" height="22"><span>Blockwork</span></a>
-<nav class="footer-links" aria-label="${t('Footer')}">
-<a href="${esc(mainUrl)}/download">${t('Download')}</a><a href="${esc(mainUrl)}/changelog">${t('Changelog')}</a><a href="${esc(place.community)}">${t('Community blocks')}</a><a href="${esc(supportUrl)}/">${t('Support')}</a>
-<a href="${REPO_URL}">${t('Source')}</a><a href="${REPO_URL}/issues">${t('Report an issue')}</a><a href="${REPO_URL}/releases">${t('All releases')}</a>
-<a href="https://github.com/Blockworked/Blockwork-community">${t('Library source')}</a><a href="${esc(translateUrl)}/">${t('Help translate')}</a>
+<nav class="footer-links" aria-label="${t('Footer')}">${links}</nav>
+</div><div class="footer-meta">
+<a href="${REPO_URL}">${t('Blockwork on GitHub')}</a><a href="${REPO_URL}/issues">${t('Report an issue')}</a><a href="${REPO_URL}/releases">${t('All releases')}</a>
+<a href="https://github.com/Blockworked/Blockwork-community">${t('Library source')}</a>
 <a href="${esc(mainUrl)}/privacy">${t('Privacy')}</a><a href="${esc(mainUrl)}/terms">${t('Terms')}</a>
-</nav>${languagePicker()}<p class="copyright">© ${year} Blockworked</p></div></footer>`;
+${languagePicker()}<p class="copyright">© ${year} Blockworked</p></div></div></footer>`;
 }
 
 /** Header and footer styles, matching blockworked.com's SiteHeader and
@@ -127,15 +131,18 @@ export const SITE_NAV_CSS = `
 @media (max-width: 920px) { .site-nav { display: none; } }
 @media (max-width: 400px) { .header-cta { display: none; } }
 
-.site-footer { border-top: 1px solid var(--glass-border); background: var(--glass); padding: 28px 0; font-size: 13px; }
-.site-footer-inner { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.site-footer { border-top: 1px solid var(--glass-border); background: var(--glass); padding: 20px 0; font-size: 13px; color: var(--muted); }
+.footer-primary, .footer-links, .footer-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; }
 .footer-brand { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--fg); }
-.footer-brand:hover { text-decoration: none; }
 .footer-brand img { width: 22px; height: 22px; }
-.footer-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
-.footer-links a { color: var(--muted); }
-.footer-links a:hover { color: var(--fg); text-decoration: none; }
-.site-footer .copyright { margin: 0 0 0 auto; color: var(--muted); }
+.footer-links a, .footer-meta a { color: inherit; }
+.site-footer a:hover { color: var(--fg); text-decoration: none; }
+.footer-meta { border-top: 1px solid var(--glass-border); margin-top: 12px; padding-top: 12px; }
+.site-footer .copyright { margin: 0 0 0 auto; }
+@media (max-width: 560px) {
+  .footer-brand, .site-footer .copyright { flex-basis: 100%; }
+  .site-footer .copyright { margin-left: 0; }
+}
 .language-picker select { font: inherit; font-size: 13px; min-height: 28px; padding: 0 6px; border-radius: var(--radius); border: 1px solid var(--glass-border); background: transparent; color: var(--muted); }
 .language-picker select:hover { color: var(--fg); }
 .site-footer .sr, .language-picker .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

@@ -219,7 +219,7 @@ msgstr ""
 msgid "See every pack"
 msgstr ""
 
-#: src/browse.ts src/pages.ts src/site-nav.ts
+#: src/browse.ts src/pages.ts
 msgid "Community blocks"
 msgstr ""
 
@@ -1551,10 +1551,6 @@ msgid "Footer"
 msgstr ""
 
 #: src/site-nav.ts
-msgid "Source"
-msgstr ""
-
-#: src/site-nav.ts
 msgid "Report an issue"
 msgstr ""
 
@@ -1564,10 +1560,6 @@ msgstr ""
 
 #: src/site-nav.ts
 msgid "Library source"
-msgstr ""
-
-#: src/site-nav.ts
-msgid "Help translate"
 msgstr ""
 
 #: src/site-nav.ts
