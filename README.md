@@ -1,5 +1,8 @@
 # Blockwork community blocks
 
+> Development moved to [`apps/community` in Blockworked/blockworked.com](https://github.com/Blockworked/blockworked.com/tree/master/apps/community).
+> This repository keeps `index.json` and `packs/` at their original URLs for older Blockwork releases.
+
 The library shown in Blockwork under **My Blocks → Browse library**, served
 by a Cloudflare Worker. Sign in with GitHub or Google to submit packs;
 every upload is reviewed before it is listed. The approved version stays
