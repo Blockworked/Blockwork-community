@@ -4,7 +4,7 @@ import { language, t, tn, tp } from './i18n.ts';
 import type { User } from "./auth.ts";
 import { PROVIDERS } from "./auth.ts";
 import { CAPABILITIES } from "./packs.ts";
-import { SITE_NAV_CSS, siteFooter, siteHeader, type NavPlace } from "./site-nav.ts";
+import { SITE_NAV_CSS, agreement, siteFooter, siteHeader, type NavPlace } from "./site-nav.ts";
 import { BROWSE_CSS } from "./browse-css.ts";
 import { SUPPORT_CSS } from "./support-css.ts";
 
@@ -216,7 +216,7 @@ export function loginPage(user: User | null, next: string, local = false): Respo
   return page(tp("Sign in"),
     user,
     false,
-    `<h1>${t('Sign in')}</h1><p class="muted">${t('An account is needed to submit packs. Browsing doesn\'t need one.')}</p><div class="signin">${buttons}</div>${local ? emailLogin(next) : ""}`,
+    `<h1>${t('Sign in')}</h1><p class="muted">${t('An account is needed to submit packs. Browsing doesn\'t need one.')}</p><div class="signin">${buttons}</div>${local ? emailLogin(next) : ""}${agreement()}`,
   );
 }
 

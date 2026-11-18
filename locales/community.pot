@@ -1534,6 +1534,19 @@ msgid "Toggle light/dark theme"
 msgstr ""
 
 #: src/site-nav.ts
+#, python-brace-format
+msgid "By signing in or creating an account, you agree to the {terms} and the {privacy}."
+msgstr ""
+
+#: src/site-nav.ts
+msgid "Terms of Service"
+msgstr ""
+
+#: src/site-nav.ts
+msgid "Privacy Policy"
+msgstr ""
+
+#: src/site-nav.ts
 msgid "Footer"
 msgstr ""
 
@@ -1555,6 +1568,14 @@ msgstr ""
 
 #: src/site-nav.ts
 msgid "Help translate"
+msgstr ""
+
+#: src/site-nav.ts
+msgid "Privacy"
+msgstr ""
+
+#: src/site-nav.ts
+msgid "Terms"
 msgstr ""
 
 #: src/support.ts

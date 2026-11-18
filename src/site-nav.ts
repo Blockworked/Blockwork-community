@@ -5,7 +5,7 @@
 // and styles) and src/layouts/Base.astro (the theme and fade scripts). Change
 // both together.
 
-import { language, languages, t, tn, tp } from './i18n.ts';
+import { language, languages, raw, t, tn, tp } from './i18n.ts';
 import { esc } from "./pages.ts";
 
 let mainUrl = "https://blockworked.com";
@@ -76,6 +76,14 @@ export function siteHeader(place = LIBRARY): string {
 </div></div></header>`;
 }
 
+/** The line under sign-in and sign-up forms pointing at the terms and privacy policy on blockworked.com. */
+export function agreement(): string {
+  return `<p class="muted agreement">${t('By signing in or creating an account, you agree to the {terms} and the {privacy}.', {
+    terms: raw(`<a href="${esc(mainUrl)}/terms">${t('Terms of Service')}</a>`),
+    privacy: raw(`<a href="${esc(mainUrl)}/privacy">${t('Privacy Policy')}</a>`),
+  })}</p>`;
+}
+
 export function siteFooter(place = LIBRARY): string {
   const year = new Date().getFullYear();
   return `<footer class="site-footer"><div class="container site-footer-inner">
@@ -84,6 +92,7 @@ export function siteFooter(place = LIBRARY): string {
 <a href="${esc(mainUrl)}/download">${t('Download')}</a><a href="${esc(mainUrl)}/changelog">${t('Changelog')}</a><a href="${esc(place.community)}">${t('Community blocks')}</a><a href="${esc(supportUrl)}/">${t('Support')}</a>
 <a href="${REPO_URL}">${t('Source')}</a><a href="${REPO_URL}/issues">${t('Report an issue')}</a><a href="${REPO_URL}/releases">${t('All releases')}</a>
 <a href="https://github.com/Blockworked/Blockwork-community">${t('Library source')}</a><a href="${esc(translateUrl)}/">${t('Help translate')}</a>
+<a href="${esc(mainUrl)}/privacy">${t('Privacy')}</a><a href="${esc(mainUrl)}/terms">${t('Terms')}</a>
 </nav>${languagePicker()}<p class="copyright">© ${year} Blockworked</p></div></footer>`;
 }
 

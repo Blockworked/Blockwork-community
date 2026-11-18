@@ -114,6 +114,13 @@ export default {
       env.DB.prepare("UPDATE comments SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at <= ?").bind(Date.now() - 90 * 86400_000),
       env.DB.prepare("UPDATE versions SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND submitted_at <= ?").bind(Date.now() - 90 * 86400_000),
       env.DB.prepare("UPDATE tickets SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at <= ?").bind(Date.now() - 90 * 86400_000),
+      env.DB.prepare("UPDATE language_proposals SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at <= ?").bind(Date.now() - 90 * 86400_000),
+      // An account's last network goes once nothing it posted from there still carries it.
+      env.DB.prepare(`UPDATE users SET ip_hash = NULL WHERE ip_hash IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM comments c WHERE c.ip_hash = users.ip_hash)
+        AND NOT EXISTS (SELECT 1 FROM versions v WHERE v.ip_hash = users.ip_hash)
+        AND NOT EXISTS (SELECT 1 FROM tickets k WHERE k.ip_hash = users.ip_hash)
+        AND NOT EXISTS (SELECT 1 FROM language_proposals p WHERE p.ip_hash = users.ip_hash)`),
       env.DB.prepare("DELETE FROM blocklist WHERE expires_at IS NOT NULL AND expires_at <= ?").bind(Date.now()),
       env.DB.prepare("DELETE FROM email_changes WHERE expires_at <= ? OR auth_version != (SELECT auth_version FROM users WHERE id = email_changes.user_id)").bind(Date.now()),
     ]);
